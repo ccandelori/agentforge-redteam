@@ -1,0 +1,39 @@
+version: 1
+
+# Target runs per (category, sub_attack) in a 7-day rolling window.
+# The selection score multiplier scales with (target - runs_last_7d).
+target_runs_per_sub_attack_per_week: 50
+
+# Coverage-weighted prioritization with epsilon exploration.
+# With probability epsilon, pick a uniformly random candidate from the
+# enabled sub_attacks. Otherwise, pick the highest-scored.
+epsilon: 0.1
+
+# Severity weight applied to the score: a sub_attack that has produced
+# higher-severity findings in the past gets prioritized.
+severity_weights:
+  P0: 4.0
+  P1: 2.0
+  P2: 1.0
+  P3: 0.5
+
+# Budget caps. Hard limits — orchestrator halts on either.
+max_session_cost_cents: 1000        # $10.00 per session
+default_campaign_budget_cents: 50   # $0.50 per campaign (CampaignBrief.budget_cents)
+
+# Canary cadence. After every N non-canary campaigns, insert one canary.
+canary_every_n_campaigns: 10
+
+# Optional per-category override for ``target_runs_per_sub_attack_per_week``.
+# When a category appears in this map the orchestrator uses that value as the
+# target for every sub_attack in the category. Omitted categories fall back to
+# the flat ``target_runs_per_sub_attack_per_week`` above.
+target_runs_per_category:
+  prompt-injection-indirect: 50
+  data-exfiltration: 40
+  tool-misuse: 30
+
+# Number of consecutive ``fail`` verdicts (most-recent window) that triggers a
+# ``no_progress`` halt. If the last N attempts in a session all failed, the
+# orchestrator halts so the operator can inspect rather than burn more budget.
+no_progress_threshold: 5
