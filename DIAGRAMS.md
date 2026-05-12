@@ -739,3 +739,18 @@ For a **5-minute architecture defense**, walk in this order:
 6. **Diagram 9 (Trust boundaries)** — "this is the surface we attack" (ties back to `THREAT_MODEL.md`).
 
 The rest (4, 5, 6, 10, 11, 12) are reference diagrams for follow-up questions.
+
+
+---
+
+## Companion documents
+
+- [`README.md`](./README.md) — quickstart + project overview
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design and agent roles
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — attack surface, in-scope vs out-of-scope
+- [`USERS.md`](./USERS.md) — operator and CISO journeys
+- [`DEFENSE.md`](./DEFENSE.md) — architecture defense (conflict-of-interest separation)
+- [`presearch.md`](./presearch.md) — initial scoping notes
+
+*Source of truth for the operational schema: `rubrics/SCHEMA.md`.
+Source of truth for the data contracts: `src/agentforge_redteam/state.py`.*

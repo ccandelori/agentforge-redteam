@@ -293,3 +293,18 @@ If time runs short, drop items 4–6 (the visuals tell those stories well enough
 > **Filing target**: GitLab issues in the AgentForge project, so findings feed the fix cycle.
 >
 > **Honest limitations**: Single-tenant MVP, frontier-model dependency, Synthea-only, small ground truth, no production-protection.
+
+
+---
+
+## Companion documents
+
+- [`README.md`](./README.md) — quickstart + project overview
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design and agent roles
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — attack surface, in-scope vs out-of-scope
+- [`USERS.md`](./USERS.md) — operator and CISO journeys
+- [`DIAGRAMS.md`](./DIAGRAMS.md) — Mermaid + ASCII system diagrams
+- [`presearch.md`](./presearch.md) — initial scoping notes
+
+*Source of truth for the operational schema: `rubrics/SCHEMA.md`.
+Source of truth for the data contracts: `src/agentforge_redteam/state.py`.*

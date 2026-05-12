@@ -256,3 +256,18 @@ It's important to state what the platform does not replace:
 - **Multi-tenancy.** For a portfolio piece, the platform is single-tenant (one operator, one AgentForge target). For a production posture, multi-tenant access controls would be required. Out of scope for this assignment.
 - **External attack-library contributions.** A future version could accept external contributions to the attack library through pull requests; for now, the library is operator-controlled.
 - **Researcher data export.** Anonymization rules for finding exports to researchers are out of scope for this assignment but are a known follow-up.
+
+
+---
+
+## Companion documents
+
+- [`README.md`](./README.md) — quickstart + project overview
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design and agent roles
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — attack surface, in-scope vs out-of-scope
+- [`DEFENSE.md`](./DEFENSE.md) — architecture defense (conflict-of-interest separation)
+- [`DIAGRAMS.md`](./DIAGRAMS.md) — Mermaid + ASCII system diagrams
+- [`presearch.md`](./presearch.md) — initial scoping notes
+
+*Source of truth for the operational schema: `rubrics/SCHEMA.md`.
+Source of truth for the data contracts: `src/agentforge_redteam/state.py`.*

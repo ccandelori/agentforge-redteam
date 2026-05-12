@@ -169,6 +169,9 @@ The deliverable that matters is not "the most impressive jailbreak in a demo." I
 
 ## Open Questions
 
+> Updated 2026-05-11. Resolved items carry a `**[RESOLVED YYYY-MM-DD]**` tag with the
+> resolving artifact; living questions remain open. Revisit at each milestone.
+
 - [ ] **Langfuse instance** — reuse the existing AgentForge Langfuse, or stand up a separate one? Reuse is faster; separate gives a cleaner audit story (attacker observability is not co-located with target observability).
 - [ ] **Second droplet** — does it need its own DigitalOcean account, or share with the AgentForge target's account? (Sharing simplifies billing; separate accounts strengthen blast-radius isolation.)
 - [ ] **Public web UI auth** — basic-auth credential, or piggyback on AgentForge's OAuth? Basic-auth is faster for Friday.
@@ -223,3 +226,18 @@ In dependency order, not parallel:
 - Hand-curated Judge ground truth before any agent code. Reason: without it, Judge accuracy is unmeasurable, and the rest of the platform calibrates against a Judge we can't trust.
 - Rubrics as versioned YAML, Judge fills the schema. Reason: prevent Judge drift; reproducibility per `(target SHA, rubric SHA, model version)`.
 - Phased deployment: droplet-only for MVP, public web UI for Final. Reason: the brief's hard gate is *target* publicly accessible + platform running, not platform UI; web UI is for the demo, not the gate.
+
+
+---
+
+## Companion documents
+
+- [`README.md`](./README.md) — quickstart + project overview
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design and agent roles
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — attack surface, in-scope vs out-of-scope
+- [`USERS.md`](./USERS.md) — operator and CISO journeys
+- [`DEFENSE.md`](./DEFENSE.md) — architecture defense (conflict-of-interest separation)
+- [`DIAGRAMS.md`](./DIAGRAMS.md) — Mermaid + ASCII system diagrams
+
+*Source of truth for the operational schema: `rubrics/SCHEMA.md`.
+Source of truth for the data contracts: `src/agentforge_redteam/state.py`.*

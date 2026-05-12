@@ -443,3 +443,18 @@ The following framework IDs were referenced in this document from training-era k
 - HIPAA §164 section numbers. The proposed-rule section numbers may shift in the final rule. Verify against the published final rule once available.
 
 These verifications are tracked in the platform's `verifications/` directory and reviewed on each living-document re-exercise.
+
+
+---
+
+## Companion documents
+
+- [`README.md`](./README.md) — quickstart + project overview
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design and agent roles
+- [`USERS.md`](./USERS.md) — operator and CISO journeys
+- [`DEFENSE.md`](./DEFENSE.md) — architecture defense (conflict-of-interest separation)
+- [`DIAGRAMS.md`](./DIAGRAMS.md) — Mermaid + ASCII system diagrams
+- [`presearch.md`](./presearch.md) — initial scoping notes
+
+*Source of truth for the operational schema: `rubrics/SCHEMA.md`.
+Source of truth for the data contracts: `src/agentforge_redteam/state.py`.*

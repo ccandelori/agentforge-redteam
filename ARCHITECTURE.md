@@ -835,3 +835,18 @@ This is the architecture-defense answer to "where does this go next?":
 8. **Continuous-evaluation grader** — a second-Judge that periodically re-evaluates a sample of past verdicts against current rubrics to catch silent drift.
 
 The architecture supports each of these as an extension, not a rewrite. That is the defensibility claim.
+
+
+---
+
+## Companion documents
+
+- [`README.md`](./README.md) — quickstart + project overview
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — attack surface, in-scope vs out-of-scope
+- [`USERS.md`](./USERS.md) — operator and CISO journeys
+- [`DEFENSE.md`](./DEFENSE.md) — architecture defense (conflict-of-interest separation)
+- [`DIAGRAMS.md`](./DIAGRAMS.md) — Mermaid + ASCII system diagrams
+- [`presearch.md`](./presearch.md) — initial scoping notes
+
+*Source of truth for the operational schema: `rubrics/SCHEMA.md`.
+Source of truth for the data contracts: `src/agentforge_redteam/state.py`.*
