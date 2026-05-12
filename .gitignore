@@ -1,25 +1,58 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-dev-debug.log
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
 
-# Dependency directories
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Python test & coverage caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Secrets & runtime state
+.env
+!.env.example
+var/
+
+# Taskmaster transient state (keep docs/ and tasks/ tracked)
+.taskmaster/state.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Assignment PRD (kept locally for context; not source of truth — see
+# .taskmaster/docs/agentforge-redteam-prd.md for the structured PRD).
+Week 3 - AgentForge - Adversarial AI Security Platform.pdf
+
+# Node toolchain + Vite build output for the Vue SPA.
+# Both rebuilt by `npm install` / `npm run build` from
+# src/agentforge_redteam/web/frontend/.
 node_modules/
 
-# Environment variables
-.env
-
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# OS specific
-.DS_Store
+# Local environment-loader artefacts (taskmaster CLI in particular)
+.env.local
