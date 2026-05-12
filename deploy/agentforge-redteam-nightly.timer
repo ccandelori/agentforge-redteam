@@ -1,0 +1,27 @@
+# systemd timer: fires the nightly session daily at 02:00 UTC.
+#
+# Enable with:
+#   systemctl enable --now agentforge-redteam-nightly.timer
+# Inspect:
+#   systemctl list-timers | grep agentforge
+
+[Unit]
+Description=Daily AgentForge Red Team nightly session
+Documentation=https://gitlab.com/your-org/agentforge-redteam/-/blob/main/deploy/README.md
+
+[Timer]
+# 02:00 UTC every day. Persistent=true means if the droplet was down at firing
+# time, the timer catches up on next boot (only once, regardless of how many
+# firings were missed).
+OnCalendar=*-*-* 02:00:00 UTC
+Persistent=true
+
+# Add ±10min jitter so we don't all hammer the LLM APIs at the same minute.
+RandomizedDelaySec=10min
+
+# If a previous nightly is still running (degenerate case — should never take
+# >30min thanks to TimeoutStartSec on the .service), skip the new firing.
+Unit=agentforge-redteam-nightly.service
+
+[Install]
+WantedBy=timers.target

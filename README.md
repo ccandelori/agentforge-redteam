@@ -1,93 +1,139 @@
-# AgentForgeRedTeam
+# AgentForge Adversarial AI Security Platform
 
+> Autonomous multi-agent platform that continuously red-teams the AgentForge Clinical
+> Co-Pilot against versioned rubrics with HIPAA-evidentiary audit logs.
 
+## Overview
 
-## Getting started
+AgentForge is an autonomous multi-agent system that continuously discovers, evaluates, and
+files security vulnerabilities in AI-assisted clinical workflows. Four agents with distinct
+trust levels and independent model providers coordinate through a LangGraph state machine:
+**Red Team** (GPT-4o, OpenAI) generates and mutates attacks, **Judge** (Claude Sonnet 4.6,
+Anthropic) scores them against versioned YAML rubrics, **Orchestrator** (Claude Haiku 4.5,
+Anthropic) prioritizes campaigns from coverage and budget state, and **Documentation**
+(Claude Sonnet 4.6, Anthropic) files findings to GitLab — autonomously for high-confidence
+P2/P3, through a human queue for P0/P1.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+The platform is positioned against the new HIPAA Security Rule §164.308(a)(1)
+AI-tool-risk-analysis substrate (NPRM finalizing May 2026), which puts AI tools explicitly
+in scope of continuous, documented risk analysis. Manual pentests cannot satisfy that
+cadence; this platform produces the evidentiary audit trail that can.
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## Status
 
-## Add your files
+Active development. MVP gate **2026-05-12**, Final gate **2026-05-15**.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## MVP Status
 
+> **Operator action required to clear the MVP gate:**
+> 1. Run `agentforge-redteam queue list` to see pending high-severity findings.
+> 2. Manually file ≥1 finding to the AgentForge GitLab project (project ID set via `GITLAB_PROJECT_ID`).
+> 3. Replace the `<MVP_GITLAB_ISSUE_URL>` placeholder below with the issue URL.
+
+- **Deployed target:** `https://143.244.157.90`
+- **Filed finding:** `<MVP_GITLAB_ISSUE_URL>` (to be replaced after operator filing)
+- **Local fallback:** when GitLab credentials are absent, the Documentation Agent writes rendered reports to `findings/<title>-<n>.md` via `LocalFindingsSink`.
+
+## Architecture at a glance
+
+- Four agents (Red Team / Judge / Orchestrator / Documentation) on a LangGraph state machine.
+- SQLite (`var/platform.db`) for queryable orchestration state; Langfuse for human-readable traces.
+- Audited tool wrapper as the single point of trust for every tool call.
+- Hard kill switch (`kill_switch` table flag) checked before every tool execution.
+
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design and
+[`DIAGRAMS.md`](./DIAGRAMS.md) for the agent-interaction diagram.
+
+## Prerequisites
+
+- Python 3.11 or newer
+- [uv](https://github.com/astral-sh/uv) 0.11+
+- API keys for Anthropic, OpenAI, Langfuse, and GitLab (see [`.env.example`](./.env.example))
+
+## Setup
+
+```bash
+git clone <repo>
+cd agentforge-redteam
+uv sync                                    # installs deps + dev tools
+cp .env.example .env                       # then fill in real keys
+uv run alembic upgrade head                # creates var/platform.db
 ```
-cd existing_repo
-git remote add origin https://labs.gauntletai.com/cameroncandelori/agentforgeredteam.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-* [Set up project integrations](https://labs.gauntletai.com/cameroncandelori/agentforgeredteam/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+> **Planned CLI (not yet implemented).** The commands below describe the operator surface
+> wired up in a later task. Until then, the platform is exercised through the test suite
+> and direct module imports.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- `agentforge-redteam start-session` — kick off a red-team session
+- `agentforge-redteam halt` — trip the kill switch
+- `agentforge-redteam queue list` / `queue approve <id>` / `queue reject <id>` — review
+  the human-approval queue
+- `agentforge-redteam regress` — run the regression harness against the current target SHA
+- `agentforge-redteam eval-judge` — run Judge against the ground-truth set
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## Development
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+uv run pytest                              # 100+ unit tests
+uv run ruff check src/ tests/              # lint
+uv run ruff format --check src/ tests/     # formatting
+uv run mypy src/                           # strict type-check
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Project layout
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```
+agentforge-redteam/
+├── alembic/                  # database migrations (SQLite schema)
+├── prompts/                  # versioned agent prompts (redteam, judge, orchestrator, doc)
+├── rubrics/                  # versioned Judge rubrics, one YAML per category (planned)
+├── src/agentforge_redteam/   # platform source
+├── templates/                # Jinja2 finding-report templates
+├── attack_library.json       # versioned seed attack payloads
+├── targets.yaml              # target URL allowlist
+├── alembic.ini               # Alembic config
+└── pyproject.toml            # project + tooling config
+```
+
+## MVP attack categories
+
+The three categories seeded in [`attack_library.json`](./attack_library.json):
+
+- **prompt-injection-indirect** — marker tokens, citation fabrication, unauthorized actions
+- **data-exfiltration** — cross-patient PHI, minimum-necessary violations, trace leakage
+- **tool-misuse** — unauthorized tool invocation, parameter tampering, recursive loops
+
+## Documentation
+
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — system design
+- [`THREAT_MODEL.md`](./THREAT_MODEL.md) — attack surface, in-scope vs out-of-scope
+- [`USERS.md`](./USERS.md) — operator and CISO journeys
+- [`DEFENSE.md`](./DEFENSE.md) — architecture defense (conflict-of-interest separation)
+- [`DIAGRAMS.md`](./DIAGRAMS.md) — Mermaid + ASCII system diagrams
+- [`presearch.md`](./presearch.md) — initial scoping notes
+- [`docs/SMOKE_TEST_COVERAGE.md`](./docs/SMOKE_TEST_COVERAGE.md) — what the integration smokes cover and the deliberate gaps (e.g., no live HTTP to the deployed target)
+- [`docs/COST_ANALYSIS.md`](./docs/COST_ANALYSIS.md) — per-run + at-scale cost projection (100 / 1K / 10K / 100K runs)
+
+## MVP Status (2026-05-12)
+
+- **Deployed target**: `https://143.244.157.90` (configured via `TARGET_DROPLET_URL`)
+- **Hard-gate docs**: ARCHITECTURE.md, THREAT_MODEL.md, USERS.md, DEFENSE.md, DIAGRAMS.md, presearch.md (all committed)
+- **Schema**: 9 SQLite tables under Alembic management; ≥1 migration applied
+- **Agents**: 4 LangGraph nodes (Red Team / Judge / Orchestrator / Documentation) wired with Protocol-typed clients
+- **Rubrics**: 3 production rubric YAMLs (prompt-injection-indirect / data-exfiltration / tool-misuse) + 1 example fixture
+- **Attack library**: 15 hand-curated seed payloads, 5 per category
+- **Ground truth**: 30 hand-authored Judge cases
+- **Findings filing path**: GitLab-or-local-file fallback — see `findings/*.md`
+- **Test suite**: 500+ unit + integration tests, mypy strict, ruff clean
+
+**Operator follow-ups for MVP submission** (manual steps):
+1. Configure `GITLAB_TOKEN` and `GITLAB_PROJECT_ID` in `.env`
+2. Run `uv run agentforge-redteam queue approve <queue_id>` on one finding from the local store
+3. Screenshot the filed GitLab issue
+4. Push to GitLab and submit the deployed URL + issue URL to the gradebook
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT — see [LICENSE](./LICENSE).

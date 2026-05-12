@@ -1,0 +1,82 @@
+# systemd unit: AgentForge Red Team — operator web UI.
+#
+# Drop into /etc/systemd/system/agentforge-redteam-web.service
+#   - systemctl daemon-reload
+#   - systemctl enable --now agentforge-redteam-web.service
+#
+# Logs land in journald. Tail with:
+#   journalctl -u agentforge-redteam-web.service -f
+
+[Unit]
+Description=AgentForge Red Team — operator web UI (FastAPI + uvicorn)
+Documentation=https://gitlab.com/your-org/agentforge-redteam/-/blob/main/deploy/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=agentforge-redteam
+Group=agentforge-redteam
+
+# Repo lives here. uv resolves the venv beneath it on first start.
+WorkingDirectory=/srv/agentforge-redteam
+
+# Secrets + non-secret config. Loaded BEFORE the ExecStartPre checks run.
+EnvironmentFile=/etc/agentforge-redteam/redteam.env
+
+# Refuse to start in production without a password. The grep is intentional —
+# we want EXIT 1 with a loud journald line, not silent fallthrough.
+ExecStartPre=/bin/sh -c 'test "$WEB_UI_ENV" = "production" && test -n "$WEB_UI_PASSWORD" || \
+  { echo "FATAL: WEB_UI_PASSWORD must be set when WEB_UI_ENV=production" >&2; exit 1; }'
+
+# Invoke the venv's uvicorn directly — skips uv at runtime so we don't need
+# write access to a uv cache dir (which ProtectSystem=strict would block).
+# `install.sh` is responsible for keeping the venv current via `uv sync`.
+ExecStart=/srv/agentforge-redteam/.venv/bin/uvicorn \
+    agentforge_redteam.web.app:app \
+    --host ${WEB_UI_HOST} \
+    --port ${WEB_UI_PORT} \
+    --proxy-headers \
+    --forwarded-allow-ips 127.0.0.1 \
+    --log-level info \
+    --no-access-log
+
+# Reload-friendly: SIGHUP is safe enough for env reload between restarts.
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=20
+
+# Process / filesystem hardening. The platform writes only to var/ + findings/
+# + evals/regressions/ + evals/judge_ground_truth/ — everything else is RO.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/agentforge-redteam/var
+ReadWritePaths=/srv/agentforge-redteam/findings
+ReadWritePaths=/srv/agentforge-redteam/evals
+LockPersonality=true
+RestrictRealtime=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+MemoryDenyWriteExecute=true
+
+# Resource caps.
+LimitNOFILE=4096
+TasksMax=128
+
+# Journald is the only sink; structured fields show up under MESSAGE_ID.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentforge-redteam-web
+
+[Install]
+WantedBy=multi-user.target

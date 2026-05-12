@@ -1,0 +1,413 @@
+{
+	"meta": {
+		"generatedAt": "2026-05-11T23:53:02.473Z",
+		"tasksAnalyzed": 50,
+		"totalTasks": 50,
+		"analysisCount": 50,
+		"thresholdScore": 5,
+		"projectName": "Task Master",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Initialize Python project with uv and pyproject.toml",
+			"complexityScore": 3,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Install uv and create pyproject.toml with metadata, (2) Add all production dependencies with correct version constraints, (3) Configure dev-dependencies and tool sections, (4) Create package structure and test with uv sync",
+			"reasoning": "Straightforward bootstrapping task with clear specification. Low complexity but foundational - requires understanding uv tool, pyproject.toml structure, and dependency management. No existing code to work with. 4 subtasks: metadata setup, prod deps, dev deps, validation."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Create .gitignore for Python project",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Simple file creation task. Template-based with clear specification. Minimal subtasks needed - can be completed as atomic task. Verification is straightforward (git status check)."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Author .env.example with required environment variables",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "File already exists but needs verification/completion. Straightforward documentation task with clear list of required variables. Atomic task - no complex logic or dependencies."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Author LICENSE file with MIT license",
+			"complexityScore": 1,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Trivial template-based task. Copy MIT license template, update copyright holder and year. No subtasks needed."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Author README.md with setup instructions and architecture diagram link",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Write overview and architecture sections with cross-references, (2) Write setup and usage sections with tested commands, (3) Write development and documentation sections with working links",
+			"reasoning": "Moderate documentation task requiring synthesis of project context. Must ensure all links resolve and commands are accurate. 3 subtasks for major sections. Depends on other docs existing."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Configure GitLab CI pipeline in .gitlab-ci.yml",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Configure base stages and image with uv caching, (2) Implement lint and type-check jobs, (3) Implement test jobs with coverage, (4) Implement eval-judge job with conditional execution and test full pipeline",
+			"reasoning": "Moderate CI/CD configuration with 4 stages, caching, and conditional execution. Requires understanding GitLab CI syntax, uv tool integration, and test patterns. Will initially fail until code exists but YAML must be valid. 4 subtasks for each stage group."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Verify six planning documents are committed and cross-linked",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Verification and linking task. Documents already exist (confirmed via analysis). Need to add executive summaries where missing and create navigation footer. Low complexity, mostly editorial work."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Verify Mermaid and ASCII diagrams in ARCHITECTURE.md and DIAGRAMS.md",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Verification task. Diagrams likely already exist in ARCHITECTURE.md (confirmed). Need to verify consistency between Mermaid and ASCII versions and ensure rendering works. Low complexity."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Verify THREAT_MODEL.md framework mapping for 3 MVP categories",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Verification task with clear checklist. Document exists (confirmed). Need to grep for specific framework IDs and verify mapping completeness. Straightforward validation work."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Update presearch.md to mark resolved open questions",
+			"complexityScore": 1,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Living document maintenance task. Low effort - add resolution markers to closed questions. Ongoing task that gets revisited. Trivial complexity."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Define Pydantic schemas for PlatformState and core message types",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Define PlatformState model with all fields and validators, (2) Define CampaignBrief and AttackRecord models, (3) Define VerdictRecord with Literal types and constraints, (4) Define ConfirmedFinding model, (5) Write comprehensive unit tests for all models with valid/invalid data",
+			"reasoning": "Moderate-high complexity. Requires understanding Pydantic v2, LangGraph state contracts, and domain modeling. No existing code patterns. Many interdependent models (5 classes). Field validators add complexity. Critical foundation task that blocks agent implementation. 5 subtasks for logical groupings."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Create SQLite schema migrations with Alembic",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Initialize Alembic and configure for SQLite, (2) Define core tables (agent_steps, attacks, verdicts, findings), (3) Define auxiliary tables (regression_runs, coverage_matrix, run_manifests), (4) Define control tables (kill_switch, human_approval_queue), (5) Test migration and verify schema with sample data",
+			"reasoning": "High complexity. Database schema design with 9 tables, complex relationships, JSON columns, constraints. Alembic migration setup. No existing database to reference. Critical foundation task. Schema correctness affects entire platform. 5 subtasks for table groupings and validation."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Implement audited tool wrapper with SQLite and Langfuse writes",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Implement kill switch check and exception handling, (2) Implement SQLite agent_steps write logic with transaction handling, (3) Integrate Langfuse span creation and lifecycle, (4) Implement cost calculation for LLM calls with tiktoken, (5) Add comprehensive error handling and logging, (6) Write unit tests with mocked DB and Langfuse",
+			"reasoning": "High complexity - single point of trust for all tool executions. Must integrate SQLite writes, Langfuse instrumentation, cost tracking, error handling, and kill switch checking. Async implementation. No reference code. Critical correctness requirement - audit trail must be complete. 6 subtasks for major functional areas."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Implement SQLite-backed kill switch with CLI halt command",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Implement kill switch query and setter functions with SQLite, (2) Define KillSwitchTripped exception and integration points, (3) Create Typer CLI command and write integration tests",
+			"reasoning": "Moderate complexity. Straightforward SQLite queries, exception definition, and CLI command. Depends on task 12 (schema) and 13 (wrapper integration). Clear specification. 3 subtasks for DB logic, exception, and CLI."
+		},
+		{
+			"taskId": 15,
+			"taskTitle": "Implement targets.yaml allowlist loader and URL validator",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Create targets.yaml with schema and seed entries, (2) Implement YAML loader and validator with exception handling, (3) Write unit tests for allowed/disallowed URLs",
+			"reasoning": "Low-moderate complexity. YAML parsing with PyYAML, simple validation logic, custom exception. Clear specification. Security-critical but straightforward implementation. 3 subtasks for YAML creation, loader, and tests."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "Implement deterministic PHI and secret sanitizer",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Implement regex patterns for PHI (MRN, SSN) and secrets (JWT, API keys), (2) Implement document truncation logic, (3) Write comprehensive unit tests with edge cases, (4) Validate sanitizer doesn't over-redact or miss patterns",
+			"reasoning": "Moderate-high complexity. Regex-based sanitization with multiple patterns. Must balance false positives vs false negatives. Security and compliance critical - PHI leakage has regulatory consequences. Testing is complex (need comprehensive edge cases). 4 subtasks for pattern groups and validation."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "Implement deterministic severity mapping from rubric outcomes",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Implement severity assignment logic with rubric outcome evaluation, (2) Define severity decision tree for all branches (P0-P3), (3) Write unit tests covering all severity branches with mock VerdictRecords",
+			"reasoning": "Moderate complexity. Deterministic logic with multiple branches. Requires understanding threat model severity levels and rubric outcome mappings. Clear specification but must handle all edge cases correctly. 3 subtasks for core logic, decision tree, and comprehensive tests."
+		},
+		{
+			"taskId": 18,
+			"taskTitle": "Design rubric YAML schema and implement loader with validation",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Author SCHEMA.md with complete rubric structure documentation, (2) Define Pydantic models (RubricCheck, Rubric) with validators, (3) Implement loader with YAML parsing, SHA256 computation, and caching, (4) Write unit tests with valid and invalid YAML fixtures",
+			"reasoning": "Moderate-high complexity. Domain-specific schema design for evaluation contracts. Pydantic validation, file hashing, caching layer. No existing patterns. Critical for Judge reproducibility. 4 subtasks for documentation, models, loader, and validation."
+		},
+		{
+			"taskId": 19,
+			"taskTitle": "Author rubric YAML for Indirect Prompt Injection",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Define category, sub-attacks, and verdict schema for prompt injection, (2) Author deterministic and LLM checks with clear criteria, (3) Define severity mapping and validate with loader",
+			"reasoning": "Moderate-high complexity. Domain expertise required - must understand indirect prompt injection attack patterns. Writing clear evaluation criteria for both deterministic and LLM checks. Must align with OWASP LLM framework. 3 subtasks for structure, checks, and validation."
+		},
+		{
+			"taskId": 20,
+			"taskTitle": "Author rubric YAML for Data Exfiltration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Define category, sub-attacks, and verdict schema for data exfiltration, (2) Author deterministic and LLM checks for PHI disclosure patterns, (3) Define severity mapping and validate with loader",
+			"reasoning": "Moderate-high complexity. Healthcare domain expertise required - PHI disclosure, HIPAA minimum necessary principle. Mix of deterministic (patient_id mismatch) and LLM-based checks. Similar complexity to task 19. 3 subtasks."
+		},
+		{
+			"taskId": 21,
+			"taskTitle": "Author rubric YAML for Tool Misuse",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Define category, sub-attacks, and verdict schema for tool misuse, (2) Author checks for unauthorized invocation, parameter tampering, audit evasion, (3) Define severity mapping and validate with loader",
+			"reasoning": "Moderate-high complexity. Requires understanding agent tool invocation patterns and audit trail requirements. Mix of deterministic (audit log presence) and LLM checks (intent matching). Similar complexity to tasks 19-20. 3 subtasks."
+		},
+		{
+			"taskId": 22,
+			"taskTitle": "Build CLI tool for interactive Judge ground-truth case authoring",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Implement category selection and rubric loading flow, (2) Implement attack input capture and optional target call with confirmation, (3) Implement verdict and confidence prompts with validation, (4) Implement per-check outcome collection with rubric consistency validation, (5) Implement YAML file generation and write with rich library formatting",
+			"reasoning": "High complexity. Interactive CLI with multiple prompts, conditional logic (optional target call), validation (verdict must match rubric), file I/O, error handling. Typer + rich integration. No existing CLI patterns in project. 5 subtasks for major workflow stages."
+		},
+		{
+			"taskId": 23,
+			"taskTitle": "Hand-author 30 Judge ground-truth cases across 3 MVP categories",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Author 10 prompt injection cases with diverse sub-attacks and payload styles, (2) Author 10 data exfiltration cases with PHI disclosure patterns, (3) Author 10 tool misuse cases with parameter tampering scenarios, (4) Validate distribution and YAML parseability across all cases",
+			"reasoning": "Moderate-high complexity. Labor-intensive manual work (4 hours timeboxed). Requires security domain expertise to craft realistic attacks. Must ensure diversity across sub-attacks and verdict distribution. Quality over quantity - cases must be meaningful. 4 subtasks for categories + validation."
+		},
+		{
+			"taskId": 24,
+			"taskTitle": "Build LangGraph state machine with 4-node graph",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Define StateGraph with PlatformState and add 4 nodes, (2) Configure edges and conditional routing with halt condition checks, (3) Implement compile and basic error handling, (4) Write unit tests with mock agents and state transitions",
+			"reasoning": "Moderate-high complexity. LangGraph framework-specific implementation. Requires understanding state machines, conditional edges, and graph compilation. No existing LangGraph code in project. Conditional logic for halt conditions. 4 subtasks for structure, routing, compilation, and testing."
+		},
+		{
+			"taskId": 25,
+			"taskTitle": "Implement Red Team Agent skeleton with GPT-4o",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Implement campaign extraction and seed payload loading from attack library, (2) Implement mutation logic with prior attempt analysis, (3) Implement OpenAI API call with prompt template and error handling, (4) Implement deterministic content filter for out-of-scope patterns, (5) Implement target HTTP call via call_target tool with allowlist validation, (6) Implement AttackRecord creation, cost tracking, and state updates with tests",
+			"reasoning": "High complexity. First agent implementation - no reference patterns. OpenAI API integration, prompt engineering, mutation logic, content filtering, HTTP calls, state management. Security-critical content filter. Complex async flow. 6 subtasks for major functional components."
+		},
+		{
+			"taskId": 26,
+			"taskTitle": "Implement Judge Agent skeleton with Claude Sonnet",
+			"complexityScore": 9,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break down into: (1) Implement AttackRecord extraction and rubric loading, (2) Implement deterministic pre-checks for all rubric checks, (3) Implement Anthropic API call with structured output for LLM checks, (4) Implement check outcome combination and verdict computation, (5) Implement VerdictRecord creation with SHA tracking, (6) Implement canary validation and halt condition, (7) Write comprehensive unit tests with mocked API and rubrics",
+			"reasoning": "Highest complexity agent. Must implement both deterministic and LLM-based evaluation. Anthropic API integration with structured output. Rubric processing logic. Canary detection and halt conditions. Reproducibility critical (SHA tracking). No reference code. 7 subtasks for complex evaluation pipeline."
+		},
+		{
+			"taskId": 27,
+			"taskTitle": "Implement Orchestrator Agent skeleton with Claude Haiku",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break down into: (1) Implement coverage_matrix query and gap computation, (2) Implement weighted prioritization with severity and time factors, (3) Implement epsilon-greedy selection algorithm, (4) Implement Haiku API call for reasoning trace, (5) Implement sub-attack selection and budget checking, (6) Implement kill switch and halt condition checks, (7) Implement CampaignBrief creation and state updates with tests",
+			"reasoning": "High complexity. Most sophisticated decision-making logic. Coverage gap analysis, weighted prioritization, epsilon-greedy algorithm, budget enforcement, multiple halt conditions. Anthropic Haiku API. Must read SQLite aggregates. Critical orchestration role. 7 subtasks for decision pipeline stages."
+		},
+		{
+			"taskId": 28,
+			"taskTitle": "Implement Documentation Agent skeleton with Claude Sonnet",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Implement verdict extraction and deduplication query, (2) Implement severity assignment and evidence sanitization, (3) Implement Anthropic API call for vulnerability report drafting, (4) Implement Jinja2 template rendering with framework tags, (5) Implement HITL routing logic for P0/P1 and low-confidence findings, (6) Implement GitLab API integration and ConfirmedFinding creation with tests",
+			"reasoning": "High complexity. Integrates multiple prior tasks (sanitizer, severity, templates). Anthropic API with prompt engineering for report quality. HITL routing decision logic. GitLab API integration. Template rendering. Deduplication queries. 6 subtasks for major functional areas."
+		},
+		{
+			"taskId": 29,
+			"taskTitle": "Wire Langfuse instrumentation into all four agent nodes",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Initialize Langfuse client with environment configuration, (2) Implement session-level trace creation in graph entrypoint, (3) Wrap all agent nodes with Langfuse spans and hierarchy, (4) Implement cross-store consistency with step_id linking to SQLite, (5) Add score attachments and test trace visibility in Langfuse dashboard",
+			"reasoning": "High complexity. Cross-cutting concern across all agents. Langfuse SDK integration, span hierarchy (session → trace → generation → span), cross-store consistency with SQLite. Must instrument 4 agents without breaking logic. Testing requires Langfuse instance. 5 subtasks for setup, hierarchy, and validation."
+		},
+		{
+			"taskId": 30,
+			"taskTitle": "Author versioned system prompts for all four agents",
+			"complexityScore": 4,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Author redteam.md with adversarial generation constraints and JSON output format, (2) Author judge.md with independent evaluation instructions and rubric integration, (3) Author orchestrator.md with coverage-based selection reasoning, (4) Author doc.md with vulnerability report structure and compute SHA256 versioning for all prompts",
+			"reasoning": "Moderate complexity. Prompt engineering for 4 distinct agent roles. Must balance instruction clarity with constraint enforcement. Output format specifications (JSON). SHA256 versioning for reproducibility. No complex logic but requires understanding agent responsibilities. 4 subtasks (one per agent)."
+		},
+		{
+			"taskId": 31,
+			"taskTitle": "Implement attack_library.json with 9 seed payloads for MVP categories",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Define JSON schema and Pydantic validation model, (2) Author 3 indirect prompt injection seeds targeting different sub-attacks, (3) Author 3 data exfiltration seeds with PHI disclosure patterns, (4) Author 3 tool misuse seeds and validate all with Pydantic",
+			"reasoning": "Moderate-high complexity. Requires security domain expertise to craft realistic seed attacks. Must understand AgentForge target surface (from THREAT_MODEL.md). JSON schema design and validation. 9 meaningful payloads across 3 categories. 4 subtasks for schema + 3 categories."
+		},
+		{
+			"taskId": 32,
+			"taskTitle": "End-to-end smoke test: Indirect Prompt Injection campaign",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Set up test environment with API keys and live target access, (2) Run start-session command and monitor Orchestrator campaign selection, (3) Verify Red Team payload generation and target HTTP call, (4) Verify Judge evaluation with rubric loading and verdict recording, (5) Validate SQLite writes, Langfuse traces, and success criteria (≥1 verdict)",
+			"reasoning": "High complexity. First integration test spanning entire system. Requires all prior components working. Live target calls with real API keys. Multi-step verification across SQLite, Langfuse, logs. Debugging complexity high if failures occur. 5 subtasks for environment, execution, and validation stages."
+		},
+		{
+			"taskId": 33,
+			"taskTitle": "End-to-end smoke test: Data Exfiltration campaign",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Configure test for data-exfiltration category with appropriate seed payloads, (2) Run start-session and monitor execution, (3) Verify rubric loading and PHI-specific checks, (4) Validate SQLite verdicts and Langfuse traces",
+			"reasoning": "Moderate-high complexity. Similar to task 32 but leveraging prior test patterns. Still requires full system integration. Different rubric and attack surface. Slightly lower complexity due to reusable test infrastructure. 4 subtasks."
+		},
+		{
+			"taskId": 34,
+			"taskTitle": "End-to-end smoke test: Tool Misuse campaign",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Configure test for tool-misuse category with tool invocation payloads, (2) Run start-session and monitor execution, (3) Verify rubric loading and tool-specific checks, (4) Validate SQLite verdicts and Langfuse traces",
+			"reasoning": "Moderate-high complexity. Similar to tasks 32-33. Third MVP category test. Can reuse test infrastructure and validation patterns. 4 subtasks."
+		},
+		{
+			"taskId": 35,
+			"taskTitle": "Expand seed payloads to produce at least one 'pass' verdict",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Analyze smoke test results and identify why verdicts are 'fail', (2) Review AgentForge target architecture for known weak points from threat model, (3) Craft 2-3 targeted payloads per category exploiting identified surfaces, (4) Update attack_library.json and re-run smoke tests, (5) Iterate until ≥1 'pass' verdict achieved and validate finding quality",
+			"reasoning": "High complexity. Requires real vulnerability discovery through iterative testing. Deep understanding of target system required. May need multiple iterations. Success not guaranteed - depends on actual vulnerabilities existing. Security research work. 5 subtasks for analysis, targeting, iteration, and validation."
+		},
+		{
+			"taskId": 36,
+			"taskTitle": "Implement minimum Documentation Agent filing path and submit MVP",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Implement fallback local file writing for findings, (2) Manually file one finding as GitLab issue following template with all labels, (3) Screenshot filed issue for documentation, (4) Update README.md with MVP status section including deployed URL and issue link, (5) Commit all code, logs, and prepare MVP submission package",
+			"reasoning": "Moderate-high complexity. Manual process with quality requirements. GitLab issue must be well-formed with correct framework tags. Documentation and submission packaging. Integration of all prior work. Gate requirement for MVP completion. 5 subtasks for filing path, manual issue, documentation, and packaging."
+		},
+		{
+			"taskId": 37,
+			"taskTitle": "Implement full Orchestrator coverage policy and session control flow",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Create orchestrator_policy.yaml with all configuration parameters, (2) Implement coverage_matrix denormalization from agent_steps and verdicts tables, (3) Implement regression trigger detection via target_sha comparison, (4) Implement all halt condition checks (cost, kill switch, canary, no progress), (5) Implement run_manifests session tracking, (6) Write comprehensive unit tests for policy branches and halt conditions",
+			"reasoning": "High complexity. Extends task 27 with full policy implementation. Complex SQL aggregations for coverage matrix. Multiple halt conditions with different triggers. Regression detection logic. State machine correctness critical. 6 subtasks for policy components and validation."
+		},
+		{
+			"taskId": 38,
+			"taskTitle": "Implement cost cap enforcement across all agents",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Integrate tiktoken for token estimation across OpenAI and Anthropic models, (2) Implement cost computation in audited tool wrapper for all LLM providers, (3) Add per-campaign budget checking in Orchestrator before dispatch, (4) Implement rate limits in Red Team (max mutations) and Judge (max rubric calls), (5) Write integration tests verifying cost cap enforcement with mock expensive calls",
+			"reasoning": "High complexity. Cross-cutting concern affecting all agents. Token estimation library integration (tiktoken). Cost tracking for multiple LLM providers with different pricing. Budget enforcement at multiple levels. Must prevent runaway spending. 5 subtasks for estimation, tracking, enforcement, and testing."
+		},
+		{
+			"taskId": 39,
+			"taskTitle": "Build Regression Harness for finding replay and verdict comparison",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Implement promote_finding_to_regression with SQLite query and JSON writing, (2) Implement replay_regression_test with target call and Judge invocation, (3) Implement verdict comparison logic with status determination (held/regressed/weakly_passing), (4) Implement regression_runs table writes, (5) Write unit tests with mock findings and target responses",
+			"reasoning": "High complexity. New subsystem for regression testing. Must replay attacks deterministically, invoke Judge with frozen rubric, compare verdicts intelligently. Status determination logic has nuance (confidence deltas). Integration with existing Judge. 5 subtasks for promotion, replay, comparison, persistence, and testing."
+		},
+		{
+			"taskId": 40,
+			"taskTitle": "Wire Regression Harness into Orchestrator trigger logic",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Implement target_sha detection and regression_due flag in Orchestrator, (2) Implement regression campaign dispatch that loads and replays all test cases, (3) Implement result aggregation and high-priority alert for P0/P1 regressions, (4) Add CLI command for manual regression runs and test with changed target_sha",
+			"reasoning": "Moderate-high complexity. Integrates task 39 harness into Orchestrator workflow. Target SHA detection, conditional regression campaigns, result aggregation. CLI command addition. Must not break normal campaign flow. 4 subtasks for detection, dispatch, aggregation, and CLI."
+		},
+		{
+			"taskId": 41,
+			"taskTitle": "Implement Judge canary mechanism with ground-truth injection",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Implement canary probability and ground-truth case selection in Orchestrator, (2) Modify Red Team to use pre-defined payload when is_canary=True, (3) Implement verdict comparison in Judge with expected_verdict matching, (4) Implement canary_failed event logging and halt condition, (5) Write integration tests with inverted expected verdicts to verify halt",
+			"reasoning": "High complexity. Judge accuracy monitoring system. Requires modifications across Orchestrator, Red Team, and Judge. Probability-based injection. Verdict comparison with confidence thresholds. Halt condition integration. Critical for Judge drift detection. 5 subtasks for injection, payload override, comparison, halt, and testing."
+		},
+		{
+			"taskId": 42,
+			"taskTitle": "Build Jinja2 vulnerability report template",
+			"complexityScore": 3,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down into: (1) Design template structure with all required sections and Jinja2 variables, (2) Implement template with proper escaping and formatting, (3) Test rendering with sample ConfirmedFinding data and verify output quality",
+			"reasoning": "Low-moderate complexity. Jinja2 template creation with defined structure. Must include all required sections from spec. Escaping and formatting. Testing with sample data. Straightforward implementation. 3 subtasks for design, implementation, and validation."
+		},
+		{
+			"taskId": 43,
+			"taskTitle": "Implement full Documentation Agent with GitLab filing and HITL routing",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Implement deduplication query and skip logic, (2) Integrate severity.py and sanitizer.py into pipeline, (3) Implement Anthropic API call for structured report drafting with quality validation, (4) Implement Jinja2 template rendering with all metadata, (5) Implement HITL routing decision tree for P0/P1 and low-confidence, (6) Implement GitLab API integration with issue creation and label attachment plus comprehensive tests",
+			"reasoning": "High complexity. Extends task 28 with full production implementation. Deduplication, severity/sanitization integration, LLM-based report generation, template rendering, HITL routing, GitLab API. Multiple decision points. Quality critical - these are public vulnerability reports. 6 subtasks for major pipeline stages."
+		},
+		{
+			"taskId": 44,
+			"taskTitle": "Implement human_approval_queue CLI workflow",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Implement 'queue list' command with formatted table display, (2) Implement 'queue approve' command with GitLab filing and database updates, (3) Implement 'queue reject' command with rejection reason and ground-truth conversion, (4) Write integration tests with seeded queue data",
+			"reasoning": "Moderate-high complexity. Human-in-the-loop workflow with 3 CLI commands. Database queries and updates. GitLab integration for approved findings. Ground-truth case generation for rejections. User experience matters - must be clear and actionable. 4 subtasks for commands and testing."
+		},
+		{
+			"taskId": 45,
+			"taskTitle": "Hand-author 3 polished vulnerability reports for Final submission",
+			"complexityScore": 6,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Select 3 best findings from MVP tests and gather all context, (2) Author detailed reports with clinical impact scenarios and remediation code examples, (3) Verify framework mappings (OWASP LLM, MITRE ATLAS, HIPAA) are current and correct, (4) File to GitLab manually if needed and screenshot for demo with final quality review",
+			"reasoning": "Moderate-high complexity. Manual curation and technical writing. Requires understanding of findings, clinical impact modeling, remediation design. Framework mapping verification. Quality bar is high - these represent the platform's output. 4 subtasks for selection, authoring, verification, and publication."
+		},
+		{
+			"taskId": 46,
+			"taskTitle": "Implement FastAPI web UI with session, coverage, findings, queue endpoints",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Break down into: (1) Initialize FastAPI app with CORS and BasicAuth middleware, (2) Implement POST /sessions/start with async LangGraph invocation, (3) Implement GET /sessions/{id} and /coverage endpoints, (4) Implement GET /findings and /findings/{id} with markdown rendering, (5) Implement POST /halt with kill switch integration, (6) Implement GET /queue and POST /queue/{id}/approve|reject endpoints, (7) Write integration tests with httpx for all endpoints",
+			"reasoning": "High complexity. Full REST API with 8+ endpoints. Async FastAPI patterns. Database integration for all endpoints. Authentication middleware. LangGraph async session management. Queue approval workflows. First web surface in project. 7 subtasks for major endpoint groups and testing."
+		},
+		{
+			"taskId": 47,
+			"taskTitle": "Build minimal web UI frontend with HTMX",
+			"complexityScore": 5,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break down into: (1) Create templates directory and base layout with Tailwind CDN, (2) Implement index.html kick-off form and coverage.html table with HTMX fetching, (3) Implement findings.html list and finding_detail.html with markdown rendering, (4) Implement queue.html with approve/reject buttons and HTMX POST, (5) Implement halt.html button and test all pages in browser",
+			"reasoning": "Moderate-high complexity. 5 HTML templates with Jinja2 + HTMX interactivity. No build step (HTMX + Tailwind CDN). Form submission, table rendering, dynamic content. Static file serving. Must work well as operator interface. 5 subtasks for page groups and browser testing."
+		},
+		{
+			"taskId": 48,
+			"taskTitle": "Deploy platform and web UI to DigitalOcean droplet with CI cron",
+			"complexityScore": 8,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Break down into: (1) Provision DigitalOcean droplet and install dependencies (Python, uv, nginx, certbot), (2) Clone repo, configure .env with production keys, and initialize database, (3) Configure systemd service for uvicorn and verify startup, (4) Configure nginx reverse proxy with SSL via Let's Encrypt, (5) Set up SSH access and configure GitLab CI cron schedule, (6) Test full deployment end-to-end with public URL access",
+			"reasoning": "High complexity. Full production deployment with infrastructure setup. DigitalOcean provisioning, systemd service configuration, nginx reverse proxy, SSL certificates, SSH, GitLab CI cron. Security considerations (secrets, basic auth, firewall). Many components that can fail. 6 subtasks for major deployment stages."
+		},
+		{
+			"taskId": 49,
+			"taskTitle": "Author AI Cost Analysis with architectural lever projections",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Calculate actual MVP dev spend from Langfuse traces and document per-agent token usage, (2) Project baseline costs at 100/1K/10K/100K runs using per-campaign cost estimates, (3) Model 6 architectural levers with cost reduction percentages and compounding effects, (4) Generate cost tables/charts and verify all calculations and lever descriptions match ARCHITECTURE.md",
+			"reasoning": "Moderate-high complexity. Financial analysis with projections. Requires understanding token pricing for multiple providers. Compounding cost reduction calculations across levers. Chart generation. Must align with ARCHITECTURE.md. Math accuracy critical. 4 subtasks for actuals, projections, levers, and validation."
+		},
+		{
+			"taskId": 50,
+			"taskTitle": "Record demo video and author social post for Final submission",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break down into: (1) Write detailed demo script with 7-section breakdown and timing, (2) Record 3-5 minute demo video with screen capture showing all workflow stages, (3) Edit, export, and upload video to YouTube or host on droplet, (4) Author and post social media content with links and capture public post URL",
+			"reasoning": "Moderate-high complexity. Video production with scripting, recording, editing. Must demonstrate all key platform features clearly. Social media post authoring with correct links. Quality matters - this is public-facing. 4 subtasks for script, recording, publishing, and social post."
+		}
+	]
+}

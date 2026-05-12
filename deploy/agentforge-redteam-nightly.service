@@ -1,0 +1,50 @@
+# systemd unit: AgentForge Red Team — nightly red-team session (oneshot).
+#
+# Fired by agentforge-redteam-nightly.timer at 02:00 UTC daily.
+
+[Unit]
+Description=AgentForge Red Team — nightly session
+Documentation=https://gitlab.com/your-org/agentforge-redteam/-/blob/main/deploy/README.md
+After=network-online.target agentforge-redteam-web.service
+Wants=network-online.target
+# Run only when the web service is up — they share the SQLite file and we want
+# the audit log surface available if anything goes sideways.
+Requires=agentforge-redteam-web.service
+
+[Service]
+Type=oneshot
+User=agentforge-redteam
+Group=agentforge-redteam
+
+WorkingDirectory=/srv/agentforge-redteam
+EnvironmentFile=/etc/agentforge-redteam/redteam.env
+
+# The nightly script wraps `agentforge-redteam regress` plus any future
+# orchestrator-start command. Keep the actual flags in the script so we don't
+# have to bounce the unit to tweak them.
+ExecStart=/srv/agentforge-redteam/deploy/agentforge-redteam-nightly.sh
+
+# Same hardening as the web unit. Nightly writes to var/ (DB), findings/ (local
+# sink if no GitLab creds), and evals/regressions/ (new test cases promoted
+# from confirmed findings).
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/agentforge-redteam/var
+ReadWritePaths=/srv/agentforge-redteam/findings
+ReadWritePaths=/srv/agentforge-redteam/evals
+
+# Hard wall on runaway sessions. The orchestrator's own cost cap is the soft
+# wall; this is the systemd kill-after-30min backstop.
+TimeoutStartSec=30min
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agentforge-redteam-nightly
