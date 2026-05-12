@@ -1,0 +1,6 @@
+# Target allowlist — the only URLs the AgentForge Red Team platform may attack.
+# No agent can modify this file at runtime. Changes require human commits.
+version: 1
+targets:
+  localhost_dev_easy: "http://localhost:8000"
+  droplet_prod: "https://143.244.157.90"
