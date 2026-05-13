@@ -1,6 +1,6 @@
 # NEXT-SESSION.md — agentforge-redteam
 
-**Last updated**: 2026-05-12 (late-night demo-prep session).
+**Last updated**: 2026-05-13 (post cost-reduction + cache verification).
 
 This file is the first thing to read at the start of any new session.
 It supersedes the prior planning-era version. What's shipped, what's
@@ -10,9 +10,14 @@ broken, what to pick up next.
 
 ## Status
 
-MVP shipped. The Week 3 demo recording is happening against a live
-Co-Pilot at `https://104-248-232-22.sslip.io/ui` with HTTPS, real
-agents, real findings persisting live to the UI. All code on `main`.
+MVP + cost-reduction + cache verification all shipped. Live platform
+at `https://104-248-232-22.sslip.io/ui` with HTTPS. Five live evidence
+packages under [`docs/EVIDENCE/`](EVIDENCE/) tell the story end-to-end:
+initial wedge → mutation parser fix → halt persistence → cost batch
+(partly inactive) → Judge cache verified engaging (95.5% hit rate on
+Sonnet). Six promoted regression cases under `evals/regressions/`
+across three attack categories. Bug-find-and-fix history in
+[`docs/BUG_LEDGER.md`](BUG_LEDGER.md). All code on `main`.
 
 ## Live URLs
 
@@ -69,30 +74,35 @@ uv run agentforge-redteam start-session \
 git push origin <branch>
 ```
 
-## What shipped today (most recent first)
+## What shipped this session (2026-05-13, most recent first)
 
 ```
-d5d6347 fix(deploy): drop HTTP/2 from TLS listener — middlebox compat
-f69e586 feat(deploy): TLS via Let's Encrypt against sslip.io hostname
-337c5c3 chore(format): ruff format pass
-6f82807 chore(lint): ruff auto-fix import + __slots__ ordering
-23858eb fix(env): clarify LANGFUSE_HOST regional choice in .env.example
-d351aee feat(spa): live polling, session status badge, live-activity card
-902fcb7 feat(web): BackgroundTasks dispatch + /sessions/active live counters
-579f648 feat(coverage): audit_log_evasion seed + canary suppression + recursion bump
-4d27962 fix(documentation): strip markdown JSON fences from doc agent LLM output
-d4d96f9 fix(judge): accept overall-verdict JSON, strip markdown fences, persist verdicts
-4f3954d feat(agents): eager attacks/verdicts/coverage_matrix persistence
-2075745 feat(target): integrate AgentForge Clinical Co-Pilot LLM endpoint
-06b9356 chore(models): rename claude-sonnet-4-20250514 → claude-sonnet-4-6
-1456984 fix(langfuse): migrate to v4 SDK
-5651e98 chore(deps): add pyjwt for AgentForge sidecar JWT minting
-781671e chore(gitignore): exclude Claude Code session state
+4e35a78 docs(evidence): session f044fd18 — cache verified + 3 new regression cases
+4e87725 docs(ledger): record cache verification + integer-cent rounding gap
+33598cf obs(cost): structured-log Anthropic usage block per call
+c6f55a9 perf(judge): inline rubric YAML in system prompt to engage Anthropic cache
+abea14d docs(evidence): session ebd35d75 — cost-reduction batch verification
+59f93cb perf(cost): prompt caching + Doc Agent Haiku + Red Team accounting
+5b2070c docs(evidence): post-fix verification run + 2 new clean regression cases
+4a64f3f docs(ledger): add docs/BUG_LEDGER.md as the rolling bug record
+60178c9 docs(evidence): add fixes-derived-from-this-session table
+227753d fix(web): persist halt_reason on manifests + 30-min session timeout
+30e44e6 docs(evidence): correct misframing of session 29488fc5 verdicts
+3a65339 fix(red_team): parse JSON envelope from mutation LLM response
+4375fe1 feat(regress): wire real HTTPTargetClient + Anthropic Judge in CLI
+5a45141 docs(evidence): package live session 29488fc5 + measured cost numbers
+be0edf5 docs(reviewer): surface deployed platform URL, retire stale claims
 ```
 
-13 commits via MR !2 + a few direct-to-main ops fixes after.
+15 commits direct-to-main, all green (649 tests, ruff/mypy clean).
+Evidence packaged across 5 live sessions in `docs/EVIDENCE/`. Bugs
+found-and-fixed indexed in `docs/BUG_LEDGER.md`.
 
 ## Known debt — prioritized
+
+For the bug-and-fix history (closed items with full bug/impact/
+resolution narrative), see [`docs/BUG_LEDGER.md`](BUG_LEDGER.md). This
+section lists what's still open.
 
 ### High
 
@@ -101,8 +111,6 @@ d4d96f9 fix(judge): accept overall-verdict JSON, strip markdown fences, persist 
    GitLab 401 / network blip kills the session before the finding is
    persisted to SQLite. **Fix**: INSERT first, then GitLab call;
    UPDATE the row's `gitlab_issue_id` after GitLab succeeds.
-   Surfaced today when a stale GITLAB_TOKEN crashed the doc agent and
-   we had to clear the env to fall back to LocalFindingsSink.
 
 2. **Canary modulo bug** (`agents/orchestrator.py`, search
    `canary_every_n_campaigns`). `campaigns_run % N == 0` fires on
@@ -112,24 +120,27 @@ d4d96f9 fix(judge): accept overall-verdict JSON, strip markdown fences, persist 
    campaigns_run % N == 0`. Then drop N back to a sensible value (10
    or 20) so drift detection actually runs.
 
-3. **Cost cap leakage**. The orchestrator halts when its tally reaches
-   the cap, but the Doc Agent's LLM call (~3¢ per finding) runs AFTER
-   that halt and pushes total spend over. Saw a 30¢-cap session land
-   at 38¢. **Fix**: pre-budget the doc-agent cost when computing
+3. **Cost cap leakage** (still open, observed live in session
+   `f044fd18`: $0.75 cap, $1.16 actual). The orchestrator halts when
+   its tally reaches the cap, but the Doc Agent's LLM call (~3¢ per
+   finding) runs AFTER that halt and pushes total spend over.
+   **Fix**: pre-budget the doc-agent cost when computing
    `proceed_or_halt`, or just subtract a 5¢ reserve from the
    effective cap.
 
+4. **Wedge root cause not diagnosed.** Session `29488fc5` hung
+   silently between campaigns 5 and 6. Symptom is now bounded by the
+   30-min wall-clock timeout (commit `227753d`), but the underlying
+   cause (most likely a hung Anthropic API call or a LangGraph
+   routing deadlock) is unknown. Did NOT recur in any subsequent
+   session, but no diagnosis means we can't say it won't.
+
 ### Medium
 
-4. **`--categories` flag is captured but unused**
+5. **`--categories` flag is captured but unused**
    (`session_runner.py:233` — `TODO(category-filter)`). The orchestrator
    enumerates from `rubrics/` directly. Wire it through so an operator
-   can scope a run to one category.
-
-5. **OpenAI mutation cost shows $0**. `red_team.generate_mutation` (88
-   calls in one run) reported 0¢. Either `OpenAIClient` returns
-   `cost_cents=0` for `gpt-4o-2024-08-06`, or the model id missed the
-   `PRICING_TABLE`. Check `clients/openai_client.py` + `cost.py`.
+   can scope a run to one category. ~1 hour fix.
 
 6. **`/sessions/active` is in-memory per-uvicorn-worker**. Restart wipes
    the running-session set. Two workers each track their own. For the
@@ -143,34 +154,85 @@ d4d96f9 fix(judge): accept overall-verdict JSON, strip markdown fences, persist 
    that polls `run_manifests` for new rows — never built. Either build
    it or commit to BackgroundTasks + bump uvicorn `--limit-concurrency`.
 
+8. **Multi-turn attacks not implemented.** State and attack schema
+   model a single `payload` (`state.py:49`, `attack_library.py:23`),
+   not a turn sequence. THREAT_MODEL.md and ARCHITECTURE.md describe
+   multi-turn capability that the code doesn't actually have.
+   Architectural change (~half day): extend `AttackRecord` to a
+   sequence of turns, update Red Team and Judge to handle.
+
+9. **Legacy stub graph.** `src/agentforge_redteam/graph.py`
+   `compile_graph()` still returns stubs. Production uses
+   `graph_factory.build_production_graph`, but a reviewer importing
+   `compile_graph()` gets the fake path. Either delete `graph.py`
+   or have it re-export `build_production_graph`. ~15 min.
+
 ### Low
 
-8. **Restore HTTP/2 on a domain migration**. `deploy/nginx-tls.conf`
-   currently disables h2 because of a middlebox issue with
-   `104-248-232-22.sslip.io` from the operator's network. When we
-   move off this IP / hostname, put `http2` back on the `listen`
-   directives.
+10. **Restore HTTP/2 on a domain migration**. `deploy/nginx-tls.conf`
+    currently disables h2 because of a middlebox issue with
+    `104-248-232-22.sslip.io` from the operator's network. When we
+    move off this IP / hostname, put `http2` back on the `listen`
+    directives.
 
-9. **Tests for eager persistence path**. New INSERT OR IGNORE in
-   red_team / judge has tests that pass, but no test verifies the
-   "INSERT happens mid-run before session end" property. Add an
-   integration test that asserts SELECT count > 0 mid-LangGraph-run.
+11. **Tests for eager persistence path**. INSERT OR IGNORE in
+    red_team / judge has tests that pass, but no test verifies the
+    "INSERT happens mid-run before session end" property. Add an
+    integration test that asserts SELECT count > 0 mid-LangGraph-run.
 
-10. **Demo-time canary cadence**. With `canary_every_n_campaigns:
+12. **Demo-time canary cadence**. With `canary_every_n_campaigns:
     9999`, the canary never fires. Once #2 is fixed, drop back to
     something like 10 — but the Sonnet 4.6 ground-truth cases may
-    need re-authoring (Sonnet calibrates differently than the
-    older Sonnet the cases were written against).
+    need re-authoring.
 
-## Operator-led TODOs
+13. **Cache savings invisible in integer-cent reports** (see
+    `BUG_LEDGER.md` Diagnosis corrections). Real Anthropic bill is
+    ~22% lower than the platform reports on cache-heavy sessions
+    (96K cache-read tokens × $3/1M × 0.9 saving rate). Conservative
+    side. Fix is to defer ROUND_CEILING to session boundaries; ~30
+    min change in `cost.py`.
 
-- **Task #50** — demo video + social post: video should be in your
-  hands by the time you read this; post wherever.
-- **Task #59** — write up findings from the demo run for the
-  deliverable. Real PASS verdicts are in `var/platform.db` on the
-  droplet (or laptop's `var/platform.db`). Polished markdown reports
-  in `/srv/agentforge-redteam/findings/` on droplet.
-- **Task #62** — TLS ✅ shipped today.
+14. **Haiku 4.5 caching does NOT engage** because Doc + Orchestrator
+    system prompts are 920-1572 tok, below Haiku's 2048-tok cache
+    minimum. Same silent-ignore pattern as the original Judge bug.
+    To fix: pad those system prompts past 2048 tok with useful
+    context (similar to Judge's rubric inlining).
+
+### Closed since last update
+
+The following items from the previous version of this list have
+been resolved. Full bug/impact/resolution in `docs/BUG_LEDGER.md`:
+
+- ~~`OpenAI mutation cost shows $0`~~ — fixed in commit `59f93cb`,
+  verified showing 6¢ in session `ebd35d75`.
+- ~~`Anthropic prompt caching deployed but inactive`~~ — fixed in
+  commit `c6f55a9`, verified engaging in session `f044fd18` (96K
+  cache-read tokens, 95.5% Sonnet hit rate).
+- ~~`halt_reason not persisted`~~ — fixed in commit `227753d`,
+  verified end-to-end in sessions `e2590f4c`, `ebd35d75`, `f044fd18`.
+- ~~`Red Team mutation JSON envelope sent to target`~~ — fixed in
+  commit `3a65339`, verified by clean payloads in subsequent sessions.
+
+## Operator-led TODOs (final-gate gating items)
+
+These are the things only an operator can do. Everything else
+remaining is described in "Known debt" above.
+
+- **Demo video + social post** (Task #50) — operator-led, ~30 min
+  recording + edit, plus posting. Suggested script: open
+  `https://104-248-232-22.sslip.io/ui/`, kick off a session via the
+  SPA, show the live-activity card updating, drill into a finding
+  detail, show the kill switch, mention the regression-corpus
+  replay path (`agentforge-redteam regress`). Three live evidence
+  packages already document the underlying functionality.
+- **Submit the gradebook entry** — point at the deployed UI URL,
+  the GitLab repo, `docs/EVIDENCE/`, `docs/BUG_LEDGER.md`, and the
+  6 polished/promoted findings. README's "MVP Status" section
+  already lists the right links.
+
+The earlier Task #59 ("write up findings from the demo run") is
+covered by `docs/EVIDENCE/` (5 sessions, 9 findings, 6 promoted
+regression cases). Task #62 (TLS) shipped previously.
 
 ## Architecture cheat sheet
 
@@ -200,10 +262,12 @@ d4d96f9 fix(judge): accept overall-verdict JSON, strip markdown fences, persist 
 
 ## Quick wins for the next 30 minutes (if that's all the time we have)
 
-1. Fix #1 (Doc Agent ordering) — small refactor in `documentation.py`,
-   adds resilience.
-2. Fix #2 (canary modulo) — one-liner + drop policy back to `N=10`.
-3. Fix #5 (OpenAI cost tracking) — likely a model-id mismatch in the
-   `PRICING_TABLE`. 5-min diagnose, 1-line fix.
+1. Fix #5 (`--categories` scoping) — wire the captured arg through
+   to the orchestrator. Operator can finally scope a session.
+2. Fix #9 (legacy stub graph) — delete or re-export. Removes a
+   misleading import path for reviewers.
+3. Fix #1 (Doc Agent persistence ordering) — INSERT-then-update.
+   Removes a real-but-rare data-loss path.
 
-All three are isolated, well-tested, and add real robustness.
+All three are isolated, well-tested, and add real robustness. None
+are required to ship final, but each closes a sharp edge.
