@@ -161,7 +161,7 @@ def test_make_cost_estimator_rejects_unknown_model_eagerly() -> None:
     "model",
     [
         "gpt-4o-2024-08-06",
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
         "openrouter/auto",
     ],

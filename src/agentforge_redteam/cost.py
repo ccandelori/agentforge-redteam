@@ -60,7 +60,7 @@ PRICING_TABLE: Final[dict[str, ModelPricing]] = {
     "gpt-4o": ModelPricing(Decimal("2.50"), Decimal("10.00")),
     "gpt-4o-mini": ModelPricing(Decimal("0.15"), Decimal("0.60")),
     # Anthropic
-    "claude-sonnet-4-20250514": ModelPricing(Decimal("3.00"), Decimal("15.00")),
+    "claude-sonnet-4-6": ModelPricing(Decimal("3.00"), Decimal("15.00")),
     "claude-haiku-4-5-20251001": ModelPricing(Decimal("1.00"), Decimal("5.00")),
     # OpenRouter fallback — use a conservative price (the real one varies)
     "openrouter/auto": ModelPricing(Decimal("3.00"), Decimal("15.00")),
