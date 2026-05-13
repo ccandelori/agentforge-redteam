@@ -118,6 +118,8 @@ The three categories seeded in [`attack_library.json`](./attack_library.json):
 - [`presearch.md`](./presearch.md) — initial scoping notes
 - [`docs/SMOKE_TEST_COVERAGE.md`](./docs/SMOKE_TEST_COVERAGE.md) — what the integration smokes cover and the deliberate gaps (e.g., no live HTTP to the deployed target)
 - [`docs/COST_ANALYSIS.md`](./docs/COST_ANALYSIS.md) — per-run + at-scale cost projection (100 / 1K / 10K / 100K runs)
+- [`docs/BUG_LEDGER.md`](./docs/BUG_LEDGER.md) — rolling record of platform bugs found and fixed, with impact + fix-commit links
+- [`docs/EVIDENCE/`](./docs/EVIDENCE/) — portable per-session evidence packages (DB dumps, cost summaries, findings)
 
 ## MVP Status (2026-05-13)
 
