@@ -31,7 +31,7 @@ def test_load_targets_returns_two_named_entries_from_real_file() -> None:
     targets = load_targets(REAL_TARGETS_PATH)
     assert set(targets.keys()) == {"localhost_dev_easy", "droplet_prod"}
     assert targets["localhost_dev_easy"] == "http://localhost:8000"
-    assert targets["droplet_prod"] == "https://143.244.157.90"
+    assert targets["droplet_prod"] == "https://143.244.157.90:9300/dashboard/turn"
 
 
 def test_load_targets_returns_custom_mapping_verbatim(tmp_path: Path) -> None:
@@ -91,7 +91,7 @@ def test_validate_target_url_raises_for_arbitrary_url() -> None:
 
 @pytest.mark.parametrize(
     "candidate",
-    ["https://143.244.157.90", "https://143.244.157.90/"],
+    ["https://143.244.157.90:9300/dashboard/turn", "https://143.244.157.90:9300/dashboard/turn/"],
 )
 def test_validate_target_url_matches_with_or_without_trailing_slash(candidate: str) -> None:
     assert validate_target_url(candidate, REAL_TARGETS_PATH) == candidate
@@ -103,8 +103,8 @@ def test_target_not_allowed_message_carries_url_and_allowed_set() -> None:
     err = excinfo.value
     assert err.url == "https://evil.example.com"
     assert "http://localhost:8000" in err.allowed
-    assert "https://143.244.157.90" in err.allowed
+    assert "https://143.244.157.90:9300/dashboard/turn" in err.allowed
     message = str(err)
     assert "https://evil.example.com" in message
     assert "http://localhost:8000" in message
-    assert "https://143.244.157.90" in message
+    assert "https://143.244.157.90:9300/dashboard/turn" in message

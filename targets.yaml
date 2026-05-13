@@ -3,4 +3,4 @@
 version: 1
 targets:
   localhost_dev_easy: "http://localhost:8000"
-  droplet_prod: "https://143.244.157.90"
+  droplet_prod: "https://143.244.157.90:9300/dashboard/turn"
