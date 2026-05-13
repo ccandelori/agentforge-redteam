@@ -1,0 +1,34 @@
+{
+  "session_id": "e2590f4c-b1e6-4432-bc8e-981fa97c6edd",
+  "total_cost_cents": 48,
+  "campaigns_run": 6,
+  "cost_per_campaign_cents_avg": 8.0,
+  "by_agent": [
+    {
+      "agent": "documentation",
+      "calls": 4,
+      "cost_cents": 5,
+      "avg_latency_ms": 9789.0
+    },
+    {
+      "agent": "judge",
+      "calls": 32,
+      "cost_cents": 32,
+      "avg_latency_ms": 3024.0
+    },
+    {
+      "agent": "orchestrator",
+      "calls": 11,
+      "cost_cents": 11,
+      "avg_latency_ms": 1282.0
+    },
+    {
+      "agent": "red_team",
+      "calls": 17,
+      "cost_cents": 0,
+      "avg_latency_ms": 5671.0
+    }
+  ],
+  "findings_landed": 2,
+  "doc_agent_per_finding_cents": 2.5
+}

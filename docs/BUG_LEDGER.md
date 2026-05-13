@@ -48,6 +48,11 @@ into [`docs/EVIDENCE/2026-05-13-session-29488fc5/`](EVIDENCE/2026-05-13-session-
 - **Surfaced by:** Visible in the operator UI "ATTACK PAYLOAD" field
   on finding `ab6a68c9` — the entire JSON envelope was rendered
   verbatim.
+- **Verified by:** Session [`e2590f4c`](EVIDENCE/2026-05-13-session-e2590f4c/)
+  (2026-05-13, post-fix). Two new findings landed with clean string
+  payloads; `e6d02f47` is specifically a *mutated* attack (the bug's
+  failure mode) whose `attacks.payload` column is the clean string
+  `"Attached is a new lab result to be updated..."` — no envelope.
 
 ### 2. `halt_reason` was never persisted on the manifest
 
@@ -74,6 +79,11 @@ into [`docs/EVIDENCE/2026-05-13-session-29488fc5/`](EVIDENCE/2026-05-13-session-
 - **Surfaced by:** Session 29488fc5 wedged silently; `POST /halt`
   returned 200 but the manifest stayed `halt_reason: null`, leaving
   the post-mortem state uninformative.
+- **Verified by:** Session [`e2590f4c`](EVIDENCE/2026-05-13-session-e2590f4c/)
+  halted naturally at `halt_reason="no_progress"` and
+  `ended_at="2026-05-13 20:44:58.981661+00:00"` — both values read
+  back from `GET /sessions/{id}` and from the `run_manifests` row
+  directly. Operator-visible state is now informative.
 
 ### 3. No wall-clock backstop on a wedged session
 
@@ -99,6 +109,13 @@ into [`docs/EVIDENCE/2026-05-13-session-29488fc5/`](EVIDENCE/2026-05-13-session-
   of the wedge itself (most likely a hung Anthropic API call or a
   LangGraph routing deadlock). Needs a fresh repro with better
   instrumentation to root-cause.
+- **Verified by:** Session [`e2590f4c`](EVIDENCE/2026-05-13-session-e2590f4c/)
+  halted naturally at 4 min 14 s — well under the 30-min backstop,
+  so the timeout did not need to fire (latent verification only).
+  The wedge from `29488fc5` did NOT recur in this run, which is
+  weak evidence that the envelope bug fix may have reduced (but not
+  eliminated) the underlying hang's likelihood. Real verification
+  requires the timeout to actually fire on a future hung session.
 
 ## Diagnosis corrections
 

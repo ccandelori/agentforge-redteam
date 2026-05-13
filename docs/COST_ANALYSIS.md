@@ -331,6 +331,41 @@ The 4¢/campaign measured matches the projection's no-finding-path math when (a)
 
 - **Documentation Agent cost.** No findings landed in this session, so there were 0 doc-agent calls. The 1–2¢/finding projection (line 116) remains unchecked.
 - **Finding rate.** This session produced 0 findings. Post-run investigation found that the Red Team mutation path was sending the LLM's JSON envelope `{"payload":...,"rationale":...,"mutation_of_attack_id":...}` to the target as the attack body instead of the inner `payload` string — so attacks against unmutated seeds went through clean, but mutated attacks sent envelope noise that the target rightly refused. The 0-finding outcome in this session is therefore not a useful data point on the model's finding rate. Bug fixed in commit `3a65339` (`red_team.py:_parse_mutation_payload`). Lifetime finding rate across all sessions on the deployed platform is **2 findings / 23 attacks ≈ 8.7%**, but those 2 findings predate the bug fix and the citation_fabrication one (`ab6a68c9`) was itself produced from a corrupted-payload mutation — so the next post-fix campaign is the first one whose finding rate is trustworthy.
+
+---
+
+## Measured: Session `e2590f4c` (2026-05-13, post-fix verification)
+
+Second live run, 6 hours after `29488fc5` and on the post-fix code path
+(commits `3a65339` + `227753d` deployed). Halted naturally with
+`halt_reason="no_progress"` in 4 min 14 s, $0.48 spent, **2 findings
+landed with clean (non-envelope) payloads**. Source dump in
+[`docs/EVIDENCE/2026-05-13-session-e2590f4c/cost_summary.json`](EVIDENCE/2026-05-13-session-e2590f4c/cost_summary.json).
+
+### Per-agent measured spend
+
+| Agent | Calls | Total cents | Cents / campaign | Avg latency |
+|---|---|---|---|---|
+| orchestrator | 11 | 11¢ | 1.83¢ | 1.28 s |
+| red_team | 17 | 0¢ | 0.0¢ | 5.67 s |
+| judge | 32 | 32¢ | 5.33¢ | 3.02 s |
+| documentation | 4 | 5¢ | 0.83¢ avg (≈2.5¢ per finding) | 9.79 s |
+| **Total** | **64** | **48¢** | **8.0¢** | — |
+
+### What this measurement adds
+
+| Projection line | Now measured? | Notes |
+|---|---|---|
+| Doc Agent ≈1–2¢/call (line 116) | **Yes — 1.25¢/call avg, 2.5¢/finding** | Within projection band; slightly above the 1.3¢ point estimate but well under the 2¢ quantized ceiling. |
+| Per-finding-bearing-run cost ≈4¢ (line 124) | **Yes — 8¢ in this run** | Higher than projection because (a) Judge ran 5.3 LLM checks/campaign vs the 3 measured in the no-finding session — likely because data-exfiltration rubric has more checks than prompt-injection-indirect, and (b) finding rate this run was 33% (2/6) vs the 10% projection assumption. |
+| Finding rate (10% projection) | **Yes — 33% in this 6-campaign sample** | Sample size still tiny (8 attacks since fix). The 6-hour-stale lifetime number is no longer trustworthy because of the envelope bug; treat the post-fix 33% as a noisy upper bound, not a load-bearing measurement. |
+| Wall-clock per-campaign | **Yes — 42 s/campaign** | Within the projection's implicit assumption of "tens of seconds per campaign". |
+
+### What is still NOT measured even after this session
+
+- **Cache hit rates** from Anthropic response headers (would need SDK-level instrumentation).
+- **Per-step token counts** from raw SDK usage (we have `cost_cents` aggregates, not raw token counts).
+- **`tool-misuse` category cost** — the orchestrator did not run any new `tool-misuse` campaigns this session (it picked from the other two categories based on coverage gaps).
 - **Cache hit rates.** Anthropic prompt-caching response headers were not captured in this run. Wiring this through `cost.py` is tracked separately.
 - **All 3 MVP categories.** Only `prompt-injection-indirect` ran due to the known `--categories` scoping gap (Known Debt #4). `data-exfiltration` and `tool-misuse` per-campaign cost is therefore still projection-only.
 
@@ -458,4 +493,5 @@ If the headline figure in this doc and the smoke output disagree by more than 1 
 | 2026-05-12 | Initial projection-only analysis. Pricing pinned to `cost.py` 2026-05-11 table. |
 | 2026-05-13 | Added "Measured" subsection from session `29488fc5` (5 campaigns, $0.20, no-finding path). Confirmed 3 Judge checks/campaign matching MVP rubric reality. Confirmed Red Team `0¢` accounting gap (NEXT-SESSION.md Known Debt #5). Lifetime finding rate 2/23 ≈ 8.7%. Source dump: `docs/EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json`. |
 | 2026-05-13 | Bug discovered + fixed: Red Team's mutation path sent the LLM's JSON envelope to the target as the attack body. Removed corrupted regression case `ab6a68c9`. Finding-rate measurement deferred to first post-fix campaign. |
+| 2026-05-13 | Added "Measured: Session e2590f4c (post-fix verification)" subsection. First measurement of Doc Agent cost (1.25¢/call, 2.5¢/finding — within projection). 6 campaigns, 2 findings, $0.48, clean halt at `no_progress`. Source dump: `docs/EVIDENCE/2026-05-13-session-e2590f4c/cost_summary.json`. |
 | TBD | Replace remaining projected token counts with raw SDK-reported usage; capture cache-hit rates. |
