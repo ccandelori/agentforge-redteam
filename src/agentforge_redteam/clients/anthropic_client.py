@@ -45,6 +45,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Final
 
+import structlog
+
 # Re-export the agents' LLMResponse type. We pick the documentation
 # variant as canonical: both ``documentation.LLMResponse`` and
 # ``judge.LLMResponse`` are ``@dataclass(frozen=True, slots=True)`` with
@@ -83,6 +85,8 @@ timeout, not a long-poll.
 # Judge and Orchestrator agents pass their own values via the model
 # kwarg if they need a different budget.
 _DEFAULT_MAX_TOKENS: Final[int] = 4096
+
+_logger = structlog.get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -190,13 +194,34 @@ class AnthropicClient:
         )
 
         text = _extract_first_text_block(response)
+        usage = getattr(response, "usage", None)
         cost_cents = _compute_cost_cents(
             model=model,
             system=system,
             user=user,
             completion_text=text,
-            usage=getattr(response, "usage", None),
+            usage=usage,
         )
+
+        # Surface the cache breakdown so an operator (or
+        # docs/EVIDENCE post-mortem) can see at a glance whether
+        # caching is engaging. Without this, the only proof would be
+        # the difference between two integer-cent cost columns —
+        # which rounding hides at MVP scale.
+        if usage is not None:
+            _logger.info(
+                "anthropic.usage",
+                model=model,
+                input_tokens=int(getattr(usage, "input_tokens", 0) or 0),
+                cache_creation_input_tokens=int(
+                    getattr(usage, "cache_creation_input_tokens", 0) or 0
+                ),
+                cache_read_input_tokens=int(
+                    getattr(usage, "cache_read_input_tokens", 0) or 0
+                ),
+                output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
+                cost_cents=cost_cents,
+            )
 
         return DocLLMResponse(text=text, cost_cents=cost_cents)
 
