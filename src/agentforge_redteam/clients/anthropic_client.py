@@ -157,26 +157,35 @@ class AnthropicClient:
         Behavior notes:
 
         * The Anthropic Messages API takes ``system`` as a top-level
-          parameter (not as a ``role: "system"`` message) — we forward
-          it as such.
+          parameter (not as a ``role: "system"`` message). We pass it as
+          a single text block with ``cache_control={"type":"ephemeral"}``
+          so the (large, static) system prompt is cached across calls
+          within a 5-minute TTL — Anthropic charges 0.1x the input rate
+          for cache reads and 1.25x for the one-time cache write. For
+          the Judge (32 calls/session, ~750 system tokens) this cuts
+          input cost by ~80% on cached calls and ~55% on Judge total.
+          The Doc Agent and Orchestrator share the cache too; the
+          marginal cost is one extra parameter object.
         * The ``user`` text goes in as the single user-role message.
         * The first text content block of the response is returned as
           ``text``. If the SDK returns an empty ``content`` array (rare
           but observable on refusal / tool-use turns), we return
           ``text=""`` rather than raising :class:`IndexError`.
-        * ``cost_cents`` is computed via
-          :func:`agentforge_redteam.cost.estimate_cost_cents` when the
-          ``cost`` module is importable AND the model has a pricing
-          entry; otherwise ``0``. The agent's audit-wrapper
-          ``cost_estimator`` is the primary cost source, so a soft
-          fallback here keeps the adapter resilient to new model names
-          and to early-bootstrap orderings where ``cost.py`` hasn't
-          landed yet.
+        * ``cost_cents`` is computed from ``response.usage`` when the
+          SDK exposes it (preferred — accounts for cache hits at
+          0.1x rate and cache writes at 1.25x). Falls back to the
+          chars-per-token estimator if usage info is missing.
         """
         response = await self._client.messages.create(
             model=model,
             max_tokens=_DEFAULT_MAX_TOKENS,
-            system=system,
+            system=[
+                {
+                    "type": "text",
+                    "text": system,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": user}],
         )
 
@@ -186,6 +195,7 @@ class AnthropicClient:
             system=system,
             user=user,
             completion_text=text,
+            usage=getattr(response, "usage", None),
         )
 
         return DocLLMResponse(text=text, cost_cents=cost_cents)
@@ -224,34 +234,64 @@ def _compute_cost_cents(
     system: str,
     user: str,
     completion_text: str,
+    usage: Any = None,
 ) -> int:
-    """Best-effort cost computation via :mod:`agentforge_redteam.cost`.
+    """Cost computation. Uses ``response.usage`` when available, else
+    falls back to chars-per-token estimation.
 
-    Returns 0 when:
-
-    * ``agentforge_redteam.cost`` cannot be imported (early-bootstrap,
-      ahead of Task 38), OR
-    * the model is not in :data:`PRICING_TABLE` (an
-      :class:`UnknownModelError` would be raised by the cost module —
-      we swallow it here because the call-site ``cost_estimator`` is
-      the canonical cost path and will raise the same error there).
-
-    The audit wrapper's ``cost_estimator`` prefers a positive
-    ``cost_cents`` from the result, so returning a non-zero value here
-    short-circuits the wrapper's chars-per-token estimation. That is
-    desirable when we trust the SDK's response shape (we don't yet —
-    Anthropic's usage block is reliable but model-keyed pricing is the
-    same heuristic the wrapper would use, so we keep them in sync by
-    falling through).
+    When the SDK returns a usable ``usage`` object we account for prompt
+    caching explicitly: cache-write tokens are billed at 1.25x the
+    input rate, cache-read tokens at 0.1x, regular input at 1x, and
+    output at the standard output rate. Returning 0 means either the
+    cost module is unimportable or the model name is unknown in
+    :data:`PRICING_TABLE`.
     """
     try:
+        from decimal import ROUND_CEILING, Decimal
+
         from agentforge_redteam.cost import (
+            PRICING_TABLE,
             UnknownModelError,
             estimate_cost_cents,
         )
     except ImportError:
         return 0
 
+    if usage is not None and model in PRICING_TABLE:
+        pricing = PRICING_TABLE[model]
+        # Read whichever fields the SDK exposes. Anthropic's recent SDKs
+        # publish ``input_tokens`` (uncached input),
+        # ``cache_creation_input_tokens``, ``cache_read_input_tokens``,
+        # and ``output_tokens``. Older SDKs may omit the cache fields —
+        # they default to 0, so this path stays correct.
+        raw_input = int(getattr(usage, "input_tokens", 0) or 0)
+        cache_write = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+        cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+        output = int(getattr(usage, "output_tokens", 0) or 0)
+        if raw_input + cache_write + cache_read + output > 0:
+            one_million = Decimal("1000000")
+            # Anthropic's published cache pricing multipliers
+            cache_write_multiplier = Decimal("1.25")
+            cache_read_multiplier = Decimal("0.10")
+            input_cost = (
+                (Decimal(raw_input) / one_million) * pricing.prompt_per_1m
+                + (Decimal(cache_write) / one_million)
+                * pricing.prompt_per_1m
+                * cache_write_multiplier
+                + (Decimal(cache_read) / one_million)
+                * pricing.prompt_per_1m
+                * cache_read_multiplier
+            )
+            output_cost = (Decimal(output) / one_million) * pricing.completion_per_1m
+            cents = ((input_cost + output_cost) * Decimal("100")).quantize(
+                Decimal("1"), rounding=ROUND_CEILING
+            )
+            return int(cents)
+
+    # Fallback: chars-per-token estimation. Conservative side
+    # (over-reports vs the real bill when caching is active and usage
+    # is unavailable). This branch fires for tests using SDK mocks that
+    # don't populate ``usage``.
     try:
         return estimate_cost_cents(
             model,
@@ -259,8 +299,6 @@ def _compute_cost_cents(
             completion_text=completion_text,
         )
     except UnknownModelError:
-        # Unknown model: defer to the wrapper's cost_estimator, which
-        # raises the same error at a more useful frame.
         return 0
 
 

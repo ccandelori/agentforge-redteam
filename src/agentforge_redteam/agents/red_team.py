@@ -278,6 +278,10 @@ async def red_team_node(
             session_id=state.session_id,
             engine=engine,
             langfuse=langfuse,
+            # Without this, the audit wrapper records cost_cents=0 for every
+            # mutation call — even though LLMResponse.cost_cents is populated
+            # by the client. NEXT-SESSION.md Known Debt #5.
+            cost_estimator=lambda response: int(getattr(response, "cost_cents", 0)),
         )
         llm_response: LLMResponse = llm_call.result
         try:

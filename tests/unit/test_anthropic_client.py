@@ -38,9 +38,17 @@ class _FakeBlock:
 
 
 class _FakeUsage:
-    def __init__(self, input_tokens: int, output_tokens: int) -> None:
+    def __init__(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        cache_creation_input_tokens: int = 0,
+        cache_read_input_tokens: int = 0,
+    ) -> None:
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
+        self.cache_creation_input_tokens = cache_creation_input_tokens
+        self.cache_read_input_tokens = cache_read_input_tokens
 
 
 class _FakeMessage:
@@ -52,11 +60,18 @@ class _FakeMessage:
         content: list[_FakeBlock] | None = None,
         input_tokens: int = 10,
         output_tokens: int = 20,
+        cache_creation_input_tokens: int = 0,
+        cache_read_input_tokens: int = 0,
     ) -> None:
         self.content: list[_FakeBlock] = (
             content if content is not None else [_FakeBlock(text="fake response")]
         )
-        self.usage = _FakeUsage(input_tokens=input_tokens, output_tokens=output_tokens)
+        self.usage = _FakeUsage(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_creation_input_tokens=cache_creation_input_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+        )
 
 
 class _FakeMessages:
@@ -191,7 +206,18 @@ async def test_complete_calls_sdk_with_system_user_and_model(
     assert len(last.create_calls) == 1
     call = last.create_calls[0]
     assert call["model"] == "claude-sonnet-4-6"
-    assert call["system"] == "you are an auditor"
+    # System prompt is sent as a single cache_control'd text block so
+    # Anthropic prompt caching kicks in (5-min TTL, 0.1x input rate on
+    # subsequent reads, 1.25x on the write). This is the contract the
+    # cost model in _compute_cost_cents expects when computing from
+    # response.usage.
+    assert call["system"] == [
+        {
+            "type": "text",
+            "text": "you are an auditor",
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
     assert call["messages"] == [{"role": "user", "content": "grade this output"}]
     # Always provides a max_tokens (SDK requires it).
     assert isinstance(call["max_tokens"], int)
@@ -303,6 +329,51 @@ async def test_complete_returns_zero_cost_for_unknown_model(
         model="never-shipped-model-xyz",
     )
     assert result.cost_cents == 0
+
+
+async def test_complete_costs_less_when_cache_hit_reported(
+    fake_anthropic_module: type[_FakeAsyncAnthropic],
+) -> None:
+    """Verifies the cache-aware cost path: when ``usage.cache_read_input_tokens``
+    is set, those tokens are billed at 0.1x instead of 1x.
+
+    Construct two scenarios with the same total input token count but
+    different cache distributions; the cached one MUST cost less.
+    Regression guard for the prompt-caching savings — without this, a
+    later refactor could silently drop the 0.1x multiplier and we'd
+    only notice on the Anthropic bill.
+    """
+    # Scale tokens up so the cache differential clears integer-cent
+    # rounding — at 1K tokens, both scenarios round to 1¢ and the test
+    # can't see the saving. 10K is well within real Judge per-call
+    # ranges once a meaty rubric + attack context is in the prompt.
+    client = AnthropicClient(api_key="sk-test")
+    last = fake_anthropic_module.last_constructed
+    assert last is not None
+    last.next_response = _FakeMessage(
+        content=[_FakeBlock(text="x")],
+        input_tokens=10000,
+        output_tokens=100,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=0,
+    )
+    no_cache = await client.complete(system="s", user="u", model="claude-sonnet-4-6")
+
+    # Scenario B: same TOTAL input tokens (10000) but 8000 of them come
+    # from cache at 0.1x. Should cost strictly less.
+    last.next_response = _FakeMessage(
+        content=[_FakeBlock(text="x")],
+        input_tokens=2000,
+        output_tokens=100,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=8000,
+    )
+    with_cache = await client.complete(system="s", user="u", model="claude-sonnet-4-6")
+
+    assert with_cache.cost_cents < no_cache.cost_cents, (
+        f"cache-read tokens should cost less than uncached input; "
+        f"no_cache={no_cache.cost_cents}¢, with_cache={with_cache.cost_cents}¢"
+    )
 
 
 # ---------------------------------------------------------------------------

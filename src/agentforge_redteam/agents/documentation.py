@@ -55,7 +55,12 @@ from agentforge_redteam.tools.wrapper import call_tool
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL: Final[str] = "claude-sonnet-4-6"
+DEFAULT_MODEL: Final[str] = "claude-haiku-4-5-20251001"
+"""Doc agent uses Haiku 4.5: report generation is more structure than
+reasoning, and Haiku is 3x cheaper than Sonnet ($1/$5 vs $3/$15 per
+1M tokens). Per session e2590f4c the doc agent was 2.5¢/finding on
+Sonnet; expect ~0.8¢/finding on Haiku."""
+
 AUTOFILE_CONFIDENCE_THRESHOLD: Final[float] = 0.7
 """Verdicts below this confidence go to the human queue regardless of severity."""
 

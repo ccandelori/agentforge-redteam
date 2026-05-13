@@ -333,7 +333,16 @@ def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch) -> None:
 
     class _Messages:
         async def create(self, **kwargs: Any) -> _Msg:
-            system = kwargs.get("system", "")
+            # Production AnthropicClient passes system as a list of text
+            # blocks (cache_control'd); fakes must accept both shapes.
+            raw_system = kwargs.get("system", "")
+            if isinstance(raw_system, list):
+                system = "".join(
+                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    for block in raw_system
+                )
+            else:
+                system = raw_system
             # The Doc Agent's system prompt is long; pick it by checking
             # for the report-section keys the doc agent's user prompt
             # always includes. (System text alone isn't a sufficient

@@ -171,7 +171,16 @@ def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch) -> None:
 
     class _Messages:
         async def create(self, **kwargs: Any) -> _Msg:
-            system = kwargs.get("system", "")
+            # Production AnthropicClient passes system as a list of text
+            # blocks (with cache_control); fakes must accept both shapes.
+            raw_system = kwargs.get("system", "")
+            if isinstance(raw_system, list):
+                system = "".join(
+                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    for block in raw_system
+                )
+            else:
+                system = raw_system
             user_text = ""
             for m in kwargs.get("messages", []):
                 if m.get("role") == "user":
