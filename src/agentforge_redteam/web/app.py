@@ -302,10 +302,58 @@ def _dispatch_session(
             summary.confirmed_findings,
             float(summary.cost_so_far_dollars),
         )
-    except Exception:
+        _record_session_terminal_state(
+            session_id=session_id,
+            halt_reason=summary.halt_reason or "completed",
+        )
+    except TimeoutError:
+        _dispatch_logger.exception("session %s dispatch timed out", session_id)
+        _record_session_terminal_state(
+            session_id=session_id,
+            halt_reason="dispatcher_timeout",
+        )
+    except Exception as exc:
         _dispatch_logger.exception("session %s dispatch crashed", session_id)
+        _record_session_terminal_state(
+            session_id=session_id,
+            halt_reason=f"dispatcher_crash:{type(exc).__name__}",
+        )
     finally:
         _active_sessions.discard(session_id)
+
+
+def _record_session_terminal_state(*, session_id: str, halt_reason: str) -> None:
+    """Persist ``halt_reason`` and ``ended_at`` on the manifest row.
+
+    Best-effort: if the engine cannot be obtained or the UPDATE fails (e.g.
+    the manifest row was never created because run_session crashed in
+    setup), we log and continue. The dispatcher's job is to surface
+    operator-visible state, not to gate session completion.
+    """
+    from datetime import datetime
+
+    from agentforge_redteam.db import create_platform_engine
+
+    try:
+        eng = create_platform_engine()
+        try:
+            with eng.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE run_manifests "
+                        "SET halt_reason = :halt_reason, ended_at = :ended_at "
+                        "WHERE session_id = :sid AND halt_reason IS NULL"
+                    ),
+                    {
+                        "halt_reason": halt_reason,
+                        "ended_at": datetime.now(UTC),
+                        "sid": session_id,
+                    },
+                )
+        finally:
+            eng.dispose()
+    except Exception:
+        _dispatch_logger.exception("failed to record terminal state for session %s", session_id)
 
 
 @app.post("/sessions/start", response_model=StartSessionResponse)
@@ -459,13 +507,16 @@ def get_session(
     ``campaigns_run`` is approximated as the number of DISTINCT
     ``campaign_id`` values seen on attacks for this session. The schema
     does not yet record campaign_id on agent_steps; once it does, this
-    becomes a tighter join. ``halt_reason`` is not stored on the manifest
-    (only inside in-memory ``PlatformState``), so we return ``None`` here
-    and surface kill-switch state via ``/halt`` / ``/resume``.
+    becomes a tighter join. ``halt_reason`` lives in the manifest column
+    of the same name (added in migration 0003); the dispatcher writes it
+    on terminal state — clean completion (``"completed"`` or the
+    in-state value), operator halt (``"operator_halt"``), dispatcher
+    timeout (``"dispatcher_timeout"``), or unexpected exception
+    (``"dispatcher_crash:<ExceptionClass>"``).
     """
     with engine.connect() as conn:
         manifest = conn.execute(
-            text("SELECT created_at FROM run_manifests WHERE session_id = :sid"),
+            text("SELECT created_at, halt_reason FROM run_manifests WHERE session_id = :sid"),
             {"sid": session_id},
         ).first()
         if manifest is None:
@@ -507,7 +558,7 @@ def get_session(
         session_id=session_id,
         campaigns_run=campaigns_run,
         cost_so_far=cost_so_far,
-        halt_reason=None,
+        halt_reason=manifest[1],
         started_at=started_at,
     )
 
@@ -650,8 +701,32 @@ def get_finding(
 
 @app.post("/halt", response_model=HaltResponse)
 def halt(op: OperatorDep, engine: EngineDep) -> HaltResponse:
-    """Trip the kill switch. Idempotent — calling twice stays halted."""
+    """Trip the kill switch and mark every in-flight session as operator-halted.
+
+    Idempotent — calling twice stays halted. The session-marking pass is
+    best-effort: if a session is already terminal (``halt_reason`` is
+    non-NULL) the UPDATE leaves it alone so we don't clobber a real halt
+    reason with the generic ``operator_halt``.
+    """
+    from datetime import datetime
+
     set_kill_switch(engine, enabled=True)
+    if _active_sessions:
+        active_snapshot = tuple(_active_sessions)
+        with engine.begin() as conn:
+            for sid in active_snapshot:
+                conn.execute(
+                    text(
+                        "UPDATE run_manifests "
+                        "SET halt_reason = :halt_reason, ended_at = :ended_at "
+                        "WHERE session_id = :sid AND halt_reason IS NULL"
+                    ),
+                    {
+                        "halt_reason": "operator_halt",
+                        "ended_at": datetime.now(UTC),
+                        "sid": sid,
+                    },
+                )
     return HaltResponse(status="halted")
 
 

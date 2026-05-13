@@ -73,6 +73,10 @@ DEFAULT_CATEGORIES: Final[tuple[str, ...]] = (
 # cap below the budget cap when smoke-testing.
 DEFAULT_MAX_CAMPAIGNS: Final[int] = 5
 
+# Wall-clock backstop for a single session. See `_invoke_with_timeout`
+# in `run_session` for the rationale.
+_SESSION_WALL_TIMEOUT_S: Final[float] = 30 * 60
+
 # The manifest row is written BEFORE any agent runs and BEFORE the agents
 # have surfaced their artefact SHAs to us. We stamp a placeholder string so
 # the row obeys the ``NOT NULL`` constraints; the agents (and a future Task)
@@ -278,7 +282,24 @@ def run_session(
         # recursion ceiling — the limit just protects against a logic bug
         # in the routing fns that would otherwise loop forever.
         recursion_limit = 20 * max_campaigns + 20
-        result = asyncio.run(app.ainvoke(initial, config={"recursion_limit": recursion_limit}))
+
+        # Wall-clock backstop. The orchestrator's cost cap, recursion limit,
+        # and per-LLM-call timeouts are all per-step ceilings; none of them
+        # bound the WHOLE session if a single async coroutine deadlocks
+        # (observed: session 29488fc5 wedged silently for 5+ min between
+        # campaigns 5 and 6 — see docs/EVIDENCE/2026-05-13-session-29488fc5/).
+        # 30 minutes is well above any normal session at MVP scale (a 75¢
+        # session typically runs 8-12 minutes wall-clock; the $10 cap
+        # would still finish inside this window with budget headroom).
+        # On expiry the dispatcher catches TimeoutError and writes
+        # halt_reason="dispatcher_timeout" to the manifest.
+        async def _invoke_with_timeout() -> Any:
+            return await asyncio.wait_for(
+                app.ainvoke(initial, config={"recursion_limit": recursion_limit}),
+                timeout=_SESSION_WALL_TIMEOUT_S,
+            )
+
+        result = asyncio.run(_invoke_with_timeout())
         final_state = _coerce_state(result)
 
         return _build_summary(

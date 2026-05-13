@@ -478,6 +478,99 @@ def test_resume_clears_switch(client: TestClient, migrated_engine: Engine) -> No
     assert bool(row[0]) is False
 
 
+def _insert_manifest_row(engine: Engine, session_id: str) -> None:
+    """Helper: insert a placeholder manifest row matching production shape."""
+    with engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "INSERT INTO run_manifests "
+                "(session_id, target_sha, prompt_set_sha, rubric_set_sha, "
+                "attack_library_sha, policy_sha, cost_cap_cents) "
+                "VALUES (:sid, 'pending', 'pending', 'pending', 'pending', 'pending', 100)"
+            ),
+            {"sid": session_id},
+        )
+
+
+def test_halt_marks_active_sessions_with_operator_halt(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """The /halt endpoint must write halt_reason='operator_halt' on every
+    in-flight session so post-mortem state is informative. Surfaced when
+    session 29488fc5 wedged: /halt returned 200 but the manifest's
+    halt_reason was never populated, so the operator-visible state stayed
+    NULL forever."""
+    from agentforge_redteam.web import app as web_app
+
+    sid = str(uuid.uuid4())
+    _insert_manifest_row(migrated_engine, sid)
+    web_app._active_sessions.add(sid)
+    try:
+        resp = client.post("/halt")
+        assert resp.status_code == 200
+        with migrated_engine.connect() as conn:
+            row = conn.execute(
+                sa.text("SELECT halt_reason, ended_at FROM run_manifests WHERE session_id = :sid"),
+                {"sid": sid},
+            ).first()
+        assert row is not None
+        assert row[0] == "operator_halt"
+        assert row[1] is not None
+    finally:
+        web_app._active_sessions.discard(sid)
+
+
+def test_halt_does_not_clobber_existing_halt_reason(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """If a session already has halt_reason set (e.g. dispatcher_crash from
+    an earlier exception path), a subsequent /halt must leave it alone —
+    the more specific reason wins over the generic operator_halt."""
+    from agentforge_redteam.web import app as web_app
+
+    sid = str(uuid.uuid4())
+    _insert_manifest_row(migrated_engine, sid)
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "UPDATE run_manifests SET halt_reason = 'dispatcher_crash:RuntimeError' "
+                "WHERE session_id = :sid"
+            ),
+            {"sid": sid},
+        )
+    web_app._active_sessions.add(sid)
+    try:
+        client.post("/halt")
+        with migrated_engine.connect() as conn:
+            row = conn.execute(
+                sa.text("SELECT halt_reason FROM run_manifests WHERE session_id = :sid"),
+                {"sid": sid},
+            ).first()
+        assert row is not None
+        assert row[0] == "dispatcher_crash:RuntimeError"
+    finally:
+        web_app._active_sessions.discard(sid)
+
+
+def test_get_session_returns_persisted_halt_reason(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """GET /sessions/{id} must read halt_reason from the manifest column
+    (added in migration 0003), not return hardcoded None."""
+    sid = str(uuid.uuid4())
+    _insert_manifest_row(migrated_engine, sid)
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "UPDATE run_manifests SET halt_reason = 'budget_exhausted' WHERE session_id = :sid"
+            ),
+            {"sid": sid},
+        )
+    resp = client.get(f"/sessions/{sid}")
+    assert resp.status_code == 200
+    assert resp.json()["halt_reason"] == "budget_exhausted"
+
+
 # ---------------------------------------------------------------------------
 # Queue
 # ---------------------------------------------------------------------------
