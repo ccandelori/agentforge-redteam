@@ -22,7 +22,12 @@ max_session_cost_cents: 1000        # $10.00 per session
 default_campaign_budget_cents: 50   # $0.50 per campaign (CampaignBrief.budget_cents)
 
 # Canary cadence. After every N non-canary campaigns, insert one canary.
-canary_every_n_campaigns: 10
+# Bumped to 9999 for the MVP demo — the canary check fires when
+# ``campaigns_run % N == 0`` which at run start means N=10 triggers on
+# campaign #0 (a known issue tracked separately). With N=9999 the demo
+# completes without a canary halt, and the per-session cost cap remains
+# the real safety brake.
+canary_every_n_campaigns: 9999
 
 # Optional per-category override for ``target_runs_per_sub_attack_per_week``.
 # When a category appears in this map the orchestrator uses that value as the

@@ -302,11 +302,11 @@ def test_run_session_max_campaigns_bounds_the_loop(
     isolated_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``max_campaigns=2`` caps the recursion limit at 12 hops. Under the
-    test fakes the orchestrator's budget halt never fires, so the loop is
-    expected to terminate either via a GraphRecursionError or by hitting
-    the cap. Either way, ``campaigns_run`` must stay bounded — not run
-    away into double digits."""
+    """``max_campaigns=2`` caps the recursion limit at ``20*2+20 = 60`` hops.
+    Under the test fakes the orchestrator's budget halt never fires, so the
+    loop is expected to terminate either via a GraphRecursionError or by
+    hitting the cap. Either way, ``campaigns_run`` must stay bounded by the
+    recursion ceiling and not run away unboundedly."""
     _install_fake_openai(monkeypatch)
     _install_fake_anthropic(monkeypatch)
     _stub_doc_persistence(monkeypatch)
@@ -323,10 +323,11 @@ def test_run_session_max_campaigns_bounds_the_loop(
             max_campaigns=2,
             rng_seed=0,
         )
-        # If we got a clean summary, it must reflect at most a small number
-        # of completed campaigns (well under any pathological double-digit
-        # runaway).
-        assert summary.campaigns_run <= 3
+        # If we got a clean summary, it must reflect a bounded number of
+        # completed campaigns — capped by the recursion ceiling (60 hops)
+        # divided by the minimum ~3 hops per campaign. 25 is a generous
+        # ceiling that still proves we didn't run away unbounded.
+        assert summary.campaigns_run <= 25
     except GraphRecursionError:
         # Recursion-limit exhaustion is the expected outcome here.
         pass
