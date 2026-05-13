@@ -131,13 +131,34 @@ class CanaryMismatch(Exception):
 # ---------------------------------------------------------------------------
 
 
+def _build_judge_system_prompt(judge_md: str, rubric_yaml: str) -> str:
+    """Combine ``judge.md`` and the active rubric YAML into one system prefix.
+
+    Why concatenate instead of leaving the rubric in the user message?
+    Anthropic prompt caching requires the cached prefix to be ≥1024 tokens
+    (Sonnet 4.6) and byte-identical across calls. ``judge.md`` alone is
+    ~799 tokens — below the threshold, so ``cache_control`` was sent but
+    silently ignored. With the rubric YAML appended, the combined prefix
+    is ~1500 tokens and clears the threshold. The rubric is byte-identical
+    across all checks within a campaign (and across campaigns within the
+    same category), so the cache writes once per category-rubric pair and
+    is read on every subsequent check.
+    """
+    return f"{judge_md}\n\n---\n# Active Rubric (YAML)\n\n{rubric_yaml}\n"
+
+
 def _build_check_user_prompt(check: RubricCheck, attack: AttackRecord) -> str:
     """Render the per-check user message for the LLM.
 
-    The system prompt comes from ``prompts/judge.md`` and is loaded once per
-    invocation. The per-check user message embeds ONLY:
+    The system prompt is the concatenation of ``prompts/judge.md`` and the
+    active rubric YAML (see :func:`_build_judge_system_prompt`), so the
+    per-check user message no longer needs to repeat the criterion text —
+    the LLM looks it up by ``check_name`` in the rubric YAML it already has
+    in the system block.
 
-      * the rubric check criteria text (NOT the rubric YAML's lineage notes),
+    The user message embeds ONLY:
+
+      * the rubric check name (looked up in the rubric YAML in system),
       * the attack payload (raw bytes the Red Team sent to the target),
       * the target response (raw bytes the target returned).
 
@@ -147,7 +168,6 @@ def _build_check_user_prompt(check: RubricCheck, attack: AttackRecord) -> str:
     """
     return (
         f"check_name: {check.name}\n"
-        f"criteria: {check.criteria}\n"
         "---\n"
         f"attack_payload: {attack.payload}\n"
         "---\n"
@@ -452,6 +472,10 @@ async def judge_node(
     # ---- 3. Load rubric + judge system prompt. --------------------------
     rubric: Rubric = load_rubric(campaign.category, rubrics_dir)
     loaded_prompt = load_prompt("judge", prompts_dir)
+    # Combined system prefix = judge.md + rubric YAML. Pushes the cached
+    # prefix above Anthropic's 1024-token cache minimum so cache_control
+    # actually engages. See ``_build_judge_system_prompt``.
+    judge_system = _build_judge_system_prompt(loaded_prompt.text, rubric.raw_text)
 
     # ---- 4. Deterministic checks. ---------------------------------------
     deterministic_hits: list[tuple[RubricCheck, bool]] = []
@@ -471,7 +495,7 @@ async def judge_node(
             agent="judge",
             tool_name=f"evaluate_check_{check.name}",
             tool=llm.complete,
-            args={"system": loaded_prompt.text, "user": user_prompt, "model": model},
+            args={"system": judge_system, "user": user_prompt, "model": model},
             session_id=state.session_id,
             engine=engine,
             langfuse=langfuse,

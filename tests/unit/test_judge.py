@@ -551,6 +551,38 @@ async def test_cost_so_far_sums_llm_cents_to_decimal_dollars(
 # ---------------------------------------------------------------------------
 
 
+async def test_judge_system_prompt_clears_anthropic_cache_minimum(
+    engine: Engine, campaign: CampaignBrief
+) -> None:
+    """Regression guard: the combined system prefix (judge.md + rubric YAML)
+    must clear Anthropic's 1024-token cache minimum for Sonnet 4.6.
+
+    Below the minimum, ``cache_control`` blocks are silently ignored by
+    the API and we get zero caching benefit (this is exactly what
+    happened before the rubric-into-system refactor — see
+    docs/BUG_LEDGER.md "Diagnosis corrections"). If a future edit
+    shrinks judge.md or strips the raw_text out of the system block,
+    this test fails before the change ships.
+    """
+    state = PlatformState(
+        session_id="cache-min-check",
+        current_campaign=campaign,
+        attack_records=[_attack(response="anything")],
+    )
+    llm = _FakeLLM()
+    await judge_node(state, engine=engine, llm=llm, rubrics_dir=RUBRICS_DIR)
+    assert llm.calls, "expected at least one Judge LLM call"
+    # Use the cost module's chars-per-token heuristic for a conservative
+    # token estimate (Anthropic's BPE is typically slightly higher).
+    system_text = llm.calls[0]["system"]
+    estimated_tokens = (len(system_text) + 3) // 4
+    assert estimated_tokens >= 1024, (
+        f"Combined Judge system prefix is only ~{estimated_tokens} tokens; "
+        f"Anthropic Sonnet 4.6 needs ≥1024 for cache_control to engage. "
+        f"Restore the rubric.raw_text concatenation in _build_judge_system_prompt."
+    )
+
+
 async def test_red_team_rationale_never_enters_judge_user_prompt(
     engine: Engine, campaign: CampaignBrief
 ) -> None:

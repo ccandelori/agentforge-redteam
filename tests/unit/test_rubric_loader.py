@@ -174,6 +174,7 @@ def test_rubric_rejects_empty_sub_attacks() -> None:
             ],
             severity_map={"partial_injection_success": "P2"},
             sha="a" * 64,
+            raw_text="<test fixture>",
         )
 
 
@@ -199,6 +200,7 @@ def test_rubric_rejects_empty_version_string() -> None:
             ],
             severity_map={"partial_injection_success": "P2"},
             sha="a" * 64,
+            raw_text="<test fixture>",
         )
 
 

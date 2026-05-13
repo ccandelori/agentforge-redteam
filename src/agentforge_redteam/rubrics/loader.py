@@ -74,6 +74,12 @@ class Rubric(BaseModel):
     severity_map: dict[str, Severity] = Field(min_length=1)
     # Not in YAML — attached by the loader after reading the file.
     sha: str = Field(min_length=64, max_length=64)
+    # Raw on-disk text. Preserved so the Judge can inline the YAML into
+    # its system block as a single cache_control'd chunk (Anthropic
+    # caching needs ≥1024-token prefixes; judge.md alone is ~799 tok,
+    # adding the rubric text pushes the prefix past the threshold).
+    # Not in YAML schema — populated by ``_build_rubric``.
+    raw_text: str = Field(min_length=1)
 
 
 class RubricNotFoundError(FileNotFoundError):
@@ -91,7 +97,7 @@ def _read_and_hash(path: Path) -> tuple[bytes, str]:
 
 
 def _build_rubric(raw_bytes: bytes, sha: str) -> Rubric:
-    """Parse YAML bytes into a :class:`Rubric`, attaching ``sha``."""
+    """Parse YAML bytes into a :class:`Rubric`, attaching ``sha`` + ``raw_text``."""
     # ``yaml.safe_load`` only — never ``yaml.load``. Untrusted YAML must not be
     # able to instantiate arbitrary Python objects.
     data = yaml.safe_load(raw_bytes)
@@ -100,6 +106,7 @@ def _build_rubric(raw_bytes: bytes, sha: str) -> Rubric:
         # model_validate on a non-dict.
         data = {"__root__": data}
     data["sha"] = sha
+    data["raw_text"] = raw_bytes.decode("utf-8")
     return Rubric.model_validate(data)
 
 
