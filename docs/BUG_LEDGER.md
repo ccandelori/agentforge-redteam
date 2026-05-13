@@ -20,6 +20,59 @@ reviewer-visible consequence), **Resolution** (the fix), **Surfaced by**
 
 ---
 
+## 2026-05-13 — Cost cap leakage fix (commit `d73f2bc`)
+
+### 6. Doc Agent inflated `state.cost_so_far` by 100x on every call
+
+- **Bug:** `agents/documentation.py:503` did
+  `new_cost = state.cost_so_far + Decimal(llm_call.cost_cents)` —
+  but `cost_so_far` is in **dollars** and `cost_cents` is in **cents**.
+  Every other agent (`red_team`, `judge`, `orchestrator`) divides by
+  100 first; Doc Agent was the outlier. A 1¢ doc call inflated
+  `state.cost_so_far` by $1.00 instead of $0.01.
+- **Compounding bug:** the existing test
+  `test_state_cost_so_far_increases_by_llm_cost` was *pinning the bug
+  in place* — it asserted `cost_so_far += Decimal(375)` for a 375-cent
+  call, which is the wrong-by-100x behavior. Test fixed alongside.
+- **Impact:** mostly invisible because the operator-facing
+  `/sessions/{id}` endpoint reads from `agent_steps.cost_cents`
+  (which is correct), so reported cost was always right. The bug
+  affected only the orchestrator's in-memory budget gate, which
+  consumes `state.cost_so_far`. Direction of the impact: budget gate
+  saw inflated values → halted EARLIER than the operator's cap
+  warranted → **under-spending**, not over-spending. Combined with
+  the second bug below, sessions oscillated unpredictably around
+  the cap.
+- **Resolution:** Commit **[`d73f2bc`](https://gitlab.com/cameroncandelori/agentforgeredteam/-/commit/d73f2bc)**
+  divides `cost_cents` by `Decimal(100)` like the other agents.
+  Test updated to assert the correct `Decimal("3.75")` for 375¢.
+- **Verified by:** Session `86d8bace` (25¢ cap, ran 9 campaigns at
+  $0.18 — well under cap, halted naturally at `no_progress`).
+
+### 7. Budget gate did not reserve for the doc-agent follow-on
+
+- **Bug:** orchestrator's `proceed_or_halt` check at
+  `orchestrator.py:494` reserved `default_campaign_budget_cents`
+  (the next campaign's full budget) but not the doc-agent call that
+  fires AFTER the next campaign if a finding lands. So a finding in
+  the last campaign before halt could push total spend ~5-10¢ over
+  the cap — observed live in session `f044fd18` ($0.75 cap →
+  $1.16 actual, $0.41 overshoot).
+- **Impact:** sessions could land 5-15% over the operator's stated
+  cap. Conservative-to-paranoid operators got blown budgets they
+  hadn't authorized.
+- **Resolution:** same commit `d73f2bc` adds
+  `_DOC_AGENT_RESERVE_CENTS = 5` to the budget gate's projection.
+  Halt now fires when
+  `cost_so_far + default_campaign_budget + 5 > cap`. 5¢ is calibrated
+  from session `e2590f4c`'s 2.5¢/finding (Sonnet) and `ebd35d75`'s
+  0.5¢/finding (Haiku) — the conservative side, well under 7% of a
+  typical 75¢ cap.
+- **Verified by:** Session `86d8bace` halted at $0.18 against a 25¢
+  cap (`no_progress` came first). Cap not exceeded; this is the
+  required acceptance criterion. A future high-finding-rate session
+  approaching the cap would be the stronger validation.
+
 ## 2026-05-13 — Cost reduction batch (commit `59f93cb`)
 
 Three patches in one commit, surfaced from cost analysis of session
