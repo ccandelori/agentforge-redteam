@@ -171,6 +171,54 @@ shipped but didn't have the projected effect, or where my earlier
 framing of a symptom was wrong. Recorded for honesty / so graders can
 trace the reasoning trail.
 
+### Cache savings invisible in platform's own integer-cent cost tracking
+
+- **Original framing (commit `c6f55a9`):** "After the rubric-into-system
+  refactor, expected ~25% session cost reduction at MVP scale."
+- **What actually happened:** Caching engages cleanly on Judge calls
+  (verified via `anthropic.usage` log lines from the live deployment
+  showing `cache_read_input_tokens=1499` and `=1579` on every Judge
+  call after the first per category — see session `f044fd18` log
+  excerpts in `docs/EVIDENCE/`). But the savings don't show up in
+  our own cost tracking because:
+  - Per-call uncached Judge cost is already only ~0.83¢
+  - Per-call cached Judge cost drops to ~0.34¢ (~60% per-call savings)
+  - **Both round to 1¢** under `cost.py`'s `ROUND_CEILING` policy
+  - Aggregate session cost stays at ~1¢ × call_count regardless of
+    whether the cache engaged
+- **Net effect:** Anthropic's actual bill is ~30-40% lower than what
+  the platform reports for sessions with significant Judge caching.
+  Conservative side (over-reporting), but means the cost cap halts
+  earlier than the operator's real budget warrants.
+- **Why this is not a bug:** the per-call rounding is intentional
+  (documented in `docs/COST_ANALYSIS.md` §"Why integer cents inflate
+  the headline"). It's a planning-side conservatism. Caching exposes
+  the gap more starkly but doesn't introduce it.
+- **Path to fix if it ever matters:** aggregate sub-cent values across
+  a session and round only at session boundaries, not per call. ~30
+  min change in `cost.py` plus updates to every caller that consumes
+  per-call cents. Out of scope for the cost-reduction batch.
+
+### Haiku 4.5 agents (Doc + Orchestrator) cache does NOT engage
+
+- **Original framing (implicit in commit `c6f55a9`):** "All Anthropic
+  callers benefit from caching — Doc and Orchestrator share the
+  same `cache_control` plumbing."
+- **What actually happened:** `anthropic.usage` log lines from session
+  `f044fd18` show `cache_read_input_tokens=0` and
+  `cache_creation_input_tokens=0` for every Doc Agent and Orchestrator
+  call. Their input is 920-1572 tokens — below **Claude Haiku 4.5's
+  2048-token cache minimum** (Sonnet's minimum is 1024). Same silent-
+  ignore behavior as the original `judge.md`-too-short bug, just at
+  a higher threshold for Haiku.
+- **Net effect:** zero. Doc Agent and Orchestrator costs are unchanged.
+  The cost-reduction batch's projected ~6% savings on these agents
+  doesn't materialize.
+- **Path to fix if it ever matters:** either (a) inline a longer
+  context into the system prompts to clear 2048 tokens, similar to
+  the Judge refactor, or (b) accept Haiku doesn't cache at MVP
+  prompt sizes and only count Judge as a cache beneficiary.
+
 ### Anthropic prompt caching deployed but inactive (judge.md too short)
 
 - **Original framing (commit `59f93cb`):** "Wrap system in a
@@ -188,19 +236,17 @@ trace the reasoning trail.
   per-call cost stayed at 1¢/call. If caching were engaging on a
   ~700-token prefix, we'd expect 30-40% per-call savings on the
   cached portion, which would be visible at this scale.
-- **Path to actually realising the savings (not done):** restructure
-  the Judge call so the rubric YAML for the active category is part
-  of the `system` block alongside `judge.md`. Combined prefix grows
-  to ~1500-2000 tokens and clears the threshold; each category's
-  rubric is reused across all checks within the campaign so caching
-  engages naturally. ~30 min refactor in `judge.py`. *Padding
-  judge.md with filler to clear 1024 tokens is dishonest and would
-  drift Judge behavior — don't.*
-- **Why this is not a bug:** the code is correct. Anthropic's API
-  behaves as documented. We shipped a fix whose precondition isn't
-  met by current prompt sizes. The patch will start paying off the
-  moment the prefix grows past 1024 tokens, with no further code
-  change needed.
+- **Resolved by:** Commit **[`c6f55a9`](https://gitlab.com/cameroncandelori/agentforgeredteam/-/commit/c6f55a9)**
+  — `_build_judge_system_prompt` concatenates `judge.md` + the active
+  rubric YAML. Combined prefix is ~1500 tokens and clears the
+  1024-tok threshold. Verified engaging in session `f044fd18` via
+  `anthropic.usage` log lines (added by commit `33598cf`):
+  `cache_read_input_tokens=1499` (data-exfiltration rubric) and
+  `=1579` (prompt-injection-indirect rubric) appear on every Judge
+  call after the first per category. Also see "Cache savings
+  invisible in platform's own integer-cent cost tracking" above for
+  why this real Anthropic-bill saving doesn't show up in our own
+  cost reports.
 
 ### Empty `rubric_outcomes={}` is not a Judge bug
 
