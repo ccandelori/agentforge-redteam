@@ -330,7 +330,7 @@ The 4¢/campaign measured matches the projection's no-finding-path math when (a)
 ### What we did NOT measure in this session
 
 - **Documentation Agent cost.** No findings landed in this session, so there were 0 doc-agent calls. The 1–2¢/finding projection (line 116) remains unchecked.
-- **Finding rate.** This session produced 0 findings (judge returned `verdict=fail` with empty `rubric_outcomes={}` for all 15 verdicts). The 10% projection assumption is therefore still pending. The platform's lifetime finding rate against this deployed target is currently 2 findings / 23 attacks across 2 sessions = **8.7%** (close to the projection's 10% midpoint).
+- **Finding rate.** This session produced 0 findings. Post-run investigation found that the Red Team mutation path was sending the LLM's JSON envelope `{"payload":...,"rationale":...,"mutation_of_attack_id":...}` to the target as the attack body instead of the inner `payload` string — so attacks against unmutated seeds went through clean, but mutated attacks sent envelope noise that the target rightly refused. The 0-finding outcome in this session is therefore not a useful data point on the model's finding rate. Bug fixed in commit `3a65339` (`red_team.py:_parse_mutation_payload`). Lifetime finding rate across all sessions on the deployed platform is **2 findings / 23 attacks ≈ 8.7%**, but those 2 findings predate the bug fix and the citation_fabrication one (`ab6a68c9`) was itself produced from a corrupted-payload mutation — so the next post-fix campaign is the first one whose finding rate is trustworthy.
 - **Cache hit rates.** Anthropic prompt-caching response headers were not captured in this run. Wiring this through `cost.py` is tracked separately.
 - **All 3 MVP categories.** Only `prompt-injection-indirect` ran due to the known `--categories` scoping gap (Known Debt #4). `data-exfiltration` and `tool-misuse` per-campaign cost is therefore still projection-only.
 
@@ -457,4 +457,5 @@ If the headline figure in this doc and the smoke output disagree by more than 1 
 |---|---|
 | 2026-05-12 | Initial projection-only analysis. Pricing pinned to `cost.py` 2026-05-11 table. |
 | 2026-05-13 | Added "Measured" subsection from session `29488fc5` (5 campaigns, $0.20, no-finding path). Confirmed 3 Judge checks/campaign matching MVP rubric reality. Confirmed Red Team `0¢` accounting gap (NEXT-SESSION.md Known Debt #5). Lifetime finding rate 2/23 ≈ 8.7%. Source dump: `docs/EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json`. |
+| 2026-05-13 | Bug discovered + fixed: Red Team's mutation path sent the LLM's JSON envelope to the target as the attack body. Removed corrupted regression case `ab6a68c9`. Finding-rate measurement deferred to first post-fix campaign. |
 | TBD | Replace remaining projected token counts with raw SDK-reported usage; capture cache-hit rates. |

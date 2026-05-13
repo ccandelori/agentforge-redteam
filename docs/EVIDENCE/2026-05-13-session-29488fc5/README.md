@@ -24,8 +24,8 @@ document earlier findings against the same target.
 - **DB SHA-256**: see `session_metadata.json` → `db_snapshot.sha256`
 - **Git SHA at capture**: see `session_metadata.json` → `git_sha_at_capture`
 - **Promoted regression cases derived from this snapshot**:
-  - `evals/regressions/ab6a68c9-7b03-4d87-acec-f90935c6d0df.json` (citation_fabrication, expected_verdict=pass, conf=0.7)
-  - `evals/regressions/6511a75f-2c86-4d8c-b62e-74b474dcdad5.json` (chart-write attempt, expected_verdict=pass, conf=0.7)
+  - `evals/regressions/6511a75f-2c86-4d8c-b62e-74b474dcdad5.json` (chart-write attempt, expected_verdict=pass, conf=0.7) — clean seed payload, valid replay case.
+  - ~~`evals/regressions/ab6a68c9-...json`~~ — promoted then **removed** after discovering its `attacks.payload` row was a JSON envelope (the mutation bug above). Re-promote after a fresh post-fix campaign produces a clean equivalent.
 
 ## What this run actually demonstrated (and what it didn't)
 
@@ -40,18 +40,39 @@ steps completed and persisted, total spend $0.20.
    stopped issuing new campaigns. No log lines emitted in the 5+ minutes
    before the manual `/halt`. Cost stayed pinned at $0.20. Likely an
    in-flight LLM-call retry loop or async deadlock — not a kill-switch
-   trip. `halt_reason` was not persisted.
+   trip. `halt_reason` was not persisted. The `web/app.py` dispatcher's
+   bare `except Exception:` swallows tracebacks, which is why this
+   looks like a hang instead of a crash.
 2. **Categories scoping.** Request asked for all 3 MVP categories
    (`prompt-injection-indirect`, `data-exfiltration`, `tool-misuse`).
    Only `prompt-injection-indirect` ran — confirmation of the known
    `--categories captured but unused` gap (see `docs/NEXT-SESSION.md`
    Known Debt #4).
-3. **Judge rubric extraction.** All 15 verdicts in this session came
-   back `verdict=fail` with empty `rubric_outcomes={}` — the Judge LLM's
-   structured output did not parse into rubric checks, so the run
-   produced no new findings. The 2 findings in `findings.json` are from
-   an earlier session today (created 02:29–02:30 UTC) on the same
-   deployed platform.
+3. **Red Team mutation JSON envelope bug — discovered post-run.** The
+   `redteam.md` prompt asks the LLM for a `{"payload": ..., "rationale":
+   ..., "mutation_of_attack_id": ...}` envelope. Prior to fix
+   commit `3a65339`, `red_team.py:245` stored the LLM's raw response
+   text as `attacks.payload` and sent that entire envelope to the
+   target. The target rightly refused the structured noise. So in this
+   run, **of the 5 attacks, only the first 4 were clean (seed or
+   structurally-correct-by-accident)**; the 5th (a marker-token
+   mutation) sent `{"payload": "<document...>", ...}` to the target.
+   The bug confounded earlier interpretation of the all-`fail`
+   verdicts: the verdicts were correct *for what the target actually
+   saw*, but the target saw envelope wrapper noise, not the real
+   attack. The bug also corrupts older findings: finding `ab6a68c9`
+   (citation_fabrication) was a mutation and has the envelope in its
+   payload column. The promoted regression case for it was therefore
+   removed; finding `6511a75f` (chart-write, a clean seed) remains.
+4. **Judge rubric extraction was not actually broken.** Earlier framing
+   in this doc said the Judge "returned empty `rubric_outcomes={}` for
+   all 15 verdicts" as a bug. It isn't: `_aggregate` returns `{}` and
+   `confidence=0.5` whenever no rubric check fires, which is the right
+   behavior when the target legitimately defends (or, in this case,
+   when the target sees JSON envelope noise instead of the real attack
+   and refuses it). The Judge LLM was returning well-formed per-check
+   JSON throughout — see any `agent_steps.result` row with `tool LIKE
+   'evaluate_check_%'`.
 
 ## How to re-derive these dumps
 
