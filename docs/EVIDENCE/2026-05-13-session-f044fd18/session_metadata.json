@@ -1,0 +1,26 @@
+{
+  "session_id": "f044fd18-734e-415b-88bd-d4a937227b66",
+  "started_at": "2026-05-13 21:57:48",
+  "ended_at": "2026-05-13 22:06:30.303298+00:00",
+  "halt_reason": "budget_exhausted",
+  "cost_cap_cents_requested": 75,
+  "total_cost_cents_actual_reported": 116,
+  "total_cost_usd_actual_reported": 1.16,
+  "cost_cap_overshoot_cents": 41,
+  "cost_cap_overshoot_note": "Known issue: cost-cap leakage (NEXT-SESSION.md Known Debt #3). Doc Agent runs after the orchestrator's halt-on-budget check, pushing total over the cap.",
+  "agent_steps_total": 150,
+  "campaigns_run": 9,
+  "deployed_platform_url": "https://104-248-232-22.sslip.io/ui/",
+  "platform_commit_at_run": "33598cf (post c6f55a9 Judge cache + 33598cf usage logging)",
+  "verifies_fixes": [
+    "c6f55a9 Anthropic prompt caching engaging on Judge \u2014 VERIFIED via anthropic.usage logs: 63/66 Sonnet calls hit cache, 96,081 cache-read tokens served at 0.1x rate.",
+    "33598cf usage logging \u2014 VERIFIED: anthropic.usage log lines visible in journalctl, structured fields parseable.",
+    "Doc Agent / Orchestrator caching \u2014 CONFIRMED INACTIVE: 0/34 Haiku calls hit cache (prompts 920-1572 tok < 2048-tok Haiku 4.5 minimum)."
+  ],
+  "db_snapshot": {
+    "filename": "platform_droplet_20260513T222404Z.db",
+    "sha256": "b4fead044cf8e3f6bdb7fe2023cfa6815c3135e7fffec36c7d2ea7ae32485e52",
+    "size_bytes": 2629632
+  },
+  "git_sha_at_capture": "4e87725ecf3878452643976847a60c4d06aa110f"
+}

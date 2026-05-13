@@ -1,0 +1,58 @@
+{
+  "session_id": "f044fd18-734e-415b-88bd-d4a937227b66",
+  "platform_reported": {
+    "total_cents": 116,
+    "by_agent": [
+      {
+        "agent": "documentation",
+        "calls": 18,
+        "cost_cents": 9,
+        "avg_latency_ms": 3930.0
+      },
+      {
+        "agent": "judge",
+        "calls": 66,
+        "cost_cents": 66,
+        "avg_latency_ms": 2971.0
+      },
+      {
+        "agent": "orchestrator",
+        "calls": 25,
+        "cost_cents": 25,
+        "avg_latency_ms": 1292.0
+      },
+      {
+        "agent": "red_team",
+        "calls": 41,
+        "cost_cents": 16,
+        "avg_latency_ms": 5117.0
+      }
+    ]
+  },
+  "anthropic_usage_aggregate": {
+    "sonnet_judge": {
+      "n_calls": 66,
+      "n_with_cache_hit": 63,
+      "input_tokens_uncached_sum": 17012,
+      "cache_read_tokens_sum": 96081,
+      "cache_write_tokens_sum": 4719,
+      "output_tokens_sum": 7772
+    },
+    "haiku_doc_orch": {
+      "n_calls": 34,
+      "n_with_cache_hit": 0,
+      "input_tokens_uncached_sum": 37061,
+      "cache_read_tokens_sum": 0,
+      "cache_write_tokens_sum": 0,
+      "output_tokens_sum": 8589
+    }
+  },
+  "real_anthropic_bill_estimated": {
+    "sonnet_cache_read_actual_usd": 0.0288,
+    "sonnet_cache_read_would_have_been_uncached_usd": 0.2882,
+    "sonnet_cache_savings_usd": 0.2594,
+    "platform_reported_overestimates_by_pct": 22.4,
+    "note": "These savings are real (your Anthropic bill will reflect them) but invisible in cost.py's per-call ROUND_CEILING reporting. Documented in BUG_LEDGER.md 'Cache savings invisible in platform's own integer-cent cost tracking'."
+  },
+  "findings_landed": 9
+}
