@@ -52,6 +52,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final, Protocol
 
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from agentforge_redteam.allowlist import (
@@ -273,6 +274,45 @@ async def red_team_node(
         status_code=target_response.status_code,
         latency_ms=target_call.latency_ms,
     )
+
+    # ---- 6b. Eagerly persist to the ``attacks`` table. ------------------
+    # The web UI reads from SQL tables, not from LangGraph state. We INSERT
+    # mid-run (in its own transaction) so the Coverage tab can show the
+    # attack within ~100ms of it landing — without waiting for the entire
+    # session to finish. The audit-trail invariant for the wrapper still
+    # holds (``agent_steps`` written by ``call_tool``); this INSERT is the
+    # operator-facing denormalization.
+    try:
+        with engine.begin() as conn:
+            # ``INSERT OR IGNORE``: idempotent under retry, and lets test
+            # fixtures that pre-seed attack rows (under the old "agents
+            # don't persist" contract) continue to work. uuid4 attack_id
+            # collisions are astronomically unlikely in production, so
+            # silent-drop is the right semantics: either the row is already
+            # there with identical data, or there's a bug we'd catch via
+            # agent_steps anyway.
+            conn.execute(
+                text(
+                    "INSERT OR IGNORE INTO attacks "
+                    "(attack_id, campaign_id, payload, target_response, "
+                    "target_sha, status_code, latency_ms) VALUES "
+                    "(:aid, :cid, :pl, :tr, :tsha, :sc, :lat)"
+                ),
+                {
+                    "aid": str(record.attack_id),
+                    "cid": str(record.campaign_id),
+                    "pl": record.payload,
+                    "tr": record.target_response,
+                    "tsha": record.target_sha,
+                    "sc": record.status_code,
+                    "lat": record.latency_ms,
+                },
+            )
+    except Exception:
+        # A persistence failure must not crash the agent — the run keeps
+        # state in memory and the orchestrator decides whether to halt.
+        # The agent_steps audit row already captured the call upstream.
+        pass
 
     # ---- 7. Sum costs in dollars (Decimal). -----------------------------
     # The target call is not a billed model, so its cents contribution is 0.

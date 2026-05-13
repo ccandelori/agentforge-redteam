@@ -535,10 +535,12 @@ async def test_verdict_persists_on_state(
     assert verdict.model_version
     assert verdict.attack_id == after_judge.attack_records[-1].attack_id
 
-    # The Doc-agent-managed ``verdicts`` table stays empty for the smoke.
+    # The Judge eagerly persists each verdict to the ``verdicts`` table so
+    # the operator UI's Findings/Coverage views populate live. The smoke
+    # ran one campaign through one judge call, so exactly one row.
     with engine.connect() as conn:
         verdicts_table_rows = conn.execute(sa.text("SELECT COUNT(*) FROM verdicts")).scalar_one()
-    assert verdicts_table_rows == 0
+    assert verdicts_table_rows == 1
 
 
 # ---------------------------------------------------------------------------
