@@ -88,6 +88,26 @@ sqlite3 var/platform_droplet_*.db \
      GROUP BY agent;"
 ```
 
+## Fixes derived from this session
+
+The wedge and the all-fail verdicts surfaced bugs that the audit
+hadn't caught. Each was patched in a separate commit so the bug →
+impact → resolution chain is reviewable:
+
+| Commit | Bug | Impact | Resolution |
+|---|---|---|---|
+| `3a65339` | `red_team.py:245` used `llm_response.text` raw — the JSON envelope `{"payload":...,"rationale":...,"mutation_of_attack_id":...}` was sent to the target as the attack body. | All mutated attacks landed against the target as structured wrapper noise; the target rightly refused them; verdicts were `fail` for the wrong reason; finding `ab6a68c9` (citation_fabrication) was a corrupted-payload mutation. | `_parse_mutation_payload` extracts the inner `payload` field with markdown-fence tolerance; falls back to seed payload + warning on parse failure. 3 tests added. Corrupted regression case `ab6a68c9` deleted. |
+| `227753d` | `run_manifests` had no `halt_reason` column; `GET /sessions/{id}` hardcoded `halt_reason=None`; `POST /halt` flipped the kill switch but did not annotate any in-flight session. | A wedged session, a clean completion, and an in-flight session all looked identical from outside the process (`halt_reason: null` for all). Operator had no quick way to verify "did this session terminate cleanly." | Migration 0003 adds `halt_reason` + `ended_at`. Dispatcher writes terminal state on every exit path (`completed`, `dispatcher_timeout`, `dispatcher_crash:<X>`). `/halt` writes `operator_halt` for active sessions (without clobbering more-specific reasons). 3 tests added. |
+| `227753d` | `session_runner.py:281` ran `asyncio.run(app.ainvoke(...))` with no wall-clock cap. Per-LLM-call timeouts (60 s) bound individual steps but not the whole session. A single hung coroutine hung the entire session indefinitely. | The 29488fc5 wedge ran for 15+ minutes before the operator manually halted it. Without intervention it would have run forever. | 30-minute backstop via `asyncio.wait_for` (`_SESSION_WALL_TIMEOUT_S`). On expiry, `TimeoutError` propagates and the dispatcher writes `halt_reason="dispatcher_timeout"`. |
+
+What these fixes do NOT do:
+- They do not diagnose the root cause of the 29488fc5 wedge itself
+  (most likely a hung Anthropic API call or LangGraph deadlock — needs
+  a fresh repro with better instrumentation to nail down).
+- They do not fix the `--categories` scoping gap (NEXT-SESSION.md
+  Known Debt #4) or the per-uvicorn-worker `_active_sessions` set
+  (Known Debt #6).
+
 ## Langfuse traces
 
 Traces for every `tool_wrapper.start` / `tool_wrapper.end` pair in this
