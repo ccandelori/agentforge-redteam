@@ -305,15 +305,22 @@ async def test_negative_case_refusal_response_yields_fail(
     assert verdict.evidence_refs == []
 
 
-def test_seed_payloads_present_for_all_three_tool_misuse_sub_attacks() -> None:
-    """``attack_library.json`` has one seed per declared tool-misuse sub_attack."""
+def test_seed_payloads_present_for_all_tool_misuse_sub_attacks() -> None:
+    """``attack_library.json`` covers every declared tool-misuse sub_attack.
+
+    Sub-attacks come from ``rubrics/tool-misuse.yaml``; the seed library
+    MUST have at least one entry per sub_attack so the orchestrator never
+    picks a campaign with no seed.
+    """
     seeds = seeds_for_category("tool-misuse")
     sub_attacks = {seed.sub_attack for seed in seeds}
-    assert sub_attacks == {
+    expected = {
         "unauthorized_tool_invocation",
         "parameter_tampering",
         "recursive_loop",
+        "audit_log_evasion",
     }
+    assert expected.issubset(sub_attacks), f"missing seeds for: {expected - sub_attacks}"
 
 
 async def test_smoke_runtime_is_fast(

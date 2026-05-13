@@ -185,12 +185,12 @@ async def test_complete_calls_sdk_with_system_user_and_model(
     await client.complete(
         system="you are an auditor",
         user="grade this output",
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
     )
 
     assert len(last.create_calls) == 1
     call = last.create_calls[0]
-    assert call["model"] == "claude-sonnet-4-20250514"
+    assert call["model"] == "claude-sonnet-4-6"
     assert call["system"] == "you are an auditor"
     assert call["messages"] == [{"role": "user", "content": "grade this output"}]
     # Always provides a max_tokens (SDK requires it).
@@ -213,7 +213,7 @@ async def test_complete_returns_doc_llm_response_with_first_text_block(
         content=[_FakeBlock(text="hello world"), _FakeBlock(text="ignored")]
     )
 
-    result = await client.complete(system="s", user="u", model="claude-sonnet-4-20250514")
+    result = await client.complete(system="s", user="u", model="claude-sonnet-4-6")
     assert isinstance(result, DocLLMResponse)
     assert result.text == "hello world"
 
@@ -226,7 +226,7 @@ async def test_complete_returns_empty_text_when_content_is_empty(
     assert last is not None
     last.next_response = _FakeMessage(content=[])
 
-    result = await client.complete(system="s", user="u", model="claude-sonnet-4-20250514")
+    result = await client.complete(system="s", user="u", model="claude-sonnet-4-6")
     assert result.text == ""
     # cost_cents is still an int — the dataclass enforces that — but for
     # an empty completion against a known model it should be the cost
@@ -251,7 +251,7 @@ async def test_complete_skips_non_text_blocks(
         content=[tool_block, _FakeBlock(text="real reply", block_type="text")]
     )
 
-    result = await client.complete(system="s", user="u", model="claude-sonnet-4-20250514")
+    result = await client.complete(system="s", user="u", model="claude-sonnet-4-6")
     assert result.text == "real reply"
 
 
@@ -263,7 +263,7 @@ async def test_complete_skips_non_text_blocks(
 async def test_complete_computes_cost_via_cost_module_when_present(
     fake_anthropic_module: type[_FakeAsyncAnthropic],
 ) -> None:
-    # claude-sonnet-4-20250514 is in PRICING_TABLE, so we should see a
+    # claude-sonnet-4-6 is in PRICING_TABLE, so we should see a
     # positive cost_cents value computed by the cost module.
     client = AnthropicClient(api_key="sk-test")
     last = fake_anthropic_module.last_constructed
@@ -273,7 +273,7 @@ async def test_complete_computes_cost_via_cost_module_when_present(
     result = await client.complete(
         system="a" * 1000,
         user="b" * 1000,
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
     )
     # Independent compute using the same function — ensures the adapter
     # is delegating cost arithmetic to the cost module rather than
@@ -281,7 +281,7 @@ async def test_complete_computes_cost_via_cost_module_when_present(
     from agentforge_redteam.cost import estimate_cost_cents
 
     expected = estimate_cost_cents(
-        "claude-sonnet-4-20250514",
+        "claude-sonnet-4-6",
         prompt_text="a" * 1000 + "b" * 1000,
         completion_text="some response",
     )

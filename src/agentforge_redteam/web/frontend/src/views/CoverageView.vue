@@ -1,7 +1,7 @@
 <script setup>
-import { api, useResource } from "../composables/api.js";
+import { api, usePolledResource } from "../composables/api.js";
 
-const { data, loading, error } = useResource(() => api("/coverage"));
+const { data, loading, error } = usePolledResource(() => api("/coverage"));
 
 function anyFindings(row) {
     return Object.values(row?.findings_by_severity || {}).some(c => c > 0);

@@ -228,18 +228,31 @@ class LangfuseClient:
     ) -> LangfuseSpanLike:
         """Open a new Langfuse span and return its handle.
 
-        We forward only the four arguments the audit wrapper actually
-        uses (``name``, ``trace_id``, ``input``, ``metadata``). The
-        underlying SDK returns an object that already structurally
-        satisfies :class:`LangfuseSpanLike` (``.update(...)`` /
-        ``.end()``), so the return is annotated as the Protocol type
-        and no adapter wrapper is needed.
+        Langfuse 4.x dropped the top-level ``.span()`` shortcut in favour
+        of OTel-shaped ``start_observation(as_type="span", ...)`` plus a
+        ``TraceContext`` for trace grouping. The wrapper's contract is
+        unchanged (still takes name / trace_id / input / metadata) — we
+        just translate the trace_id seed into a W3C-format trace id via
+        ``create_trace_id`` so two spans sharing a step_id land in the
+        same Langfuse trace, then pass it via ``trace_context``.
+
+        ``TraceContext`` is a TypedDict at the SDK seam, so we build it
+        as a plain ``dict`` to avoid importing ``langfuse.types`` at
+        module level (keeps the lazy-import discipline intact and keeps
+        the test seam shallow — a stubbed ``langfuse`` module doesn't
+        need to ship a ``.types`` submodule).
         """
-        span: LangfuseSpanLike = self._client.span(
+        trace_context: dict[str, str] | None = None
+        if trace_id is not None:
+            normalized = self._client.create_trace_id(seed=trace_id)
+            trace_context = {"trace_id": normalized}
+
+        span: LangfuseSpanLike = self._client.start_observation(
             name=name,
-            trace_id=trace_id,
+            as_type="span",
             input=input,
             metadata=metadata,
+            trace_context=trace_context,
         )
         return span
 

@@ -62,6 +62,50 @@ class StartSessionResponse(BaseModel):
     session_id: str
 
 
+class ActiveSessionActivity(BaseModel):
+    """Per-session live counters — answers the operator's "is anything
+    actually happening?" question between cosmic-quiet (0 findings) runs.
+
+    Counters come from JOIN-free SELECTs against the same tables the
+    other UI views read; they're cheap (~ms) and tolerate the eager
+    persistence model used by the agents.
+    """
+
+    session_id: str
+    attacks: int
+    verdicts: int
+    verdicts_pass: int
+    verdicts_partial: int
+    verdicts_fail: int
+    verdicts_inconclusive: int
+    findings: int
+    cost_cents: int
+    last_agent: str | None = None
+    last_tool: str | None = None
+    last_step_at: datetime | None = None
+    started_at: datetime | None = None
+
+
+class ActiveSessionsResponse(BaseModel):
+    """Body for ``GET /sessions/active`` — operator UI status indicator.
+
+    The server tracks dispatched sessions in memory; this endpoint returns
+    the snapshot so the SessionView can show a "running / idle" badge and
+    disable the Start button while a dispatch is in flight.
+
+    The ``activity`` list carries per-session live counters so the UI can
+    reassure the operator that work is happening even on a session that
+    produces zero findings (the Co-Pilot defending all attacks is a
+    legitimate "well-built target" outcome — but visually indistinguishable
+    from "nothing's running" without these counters).
+    """
+
+    active: list[str]
+    is_running: bool
+    count: int
+    activity: list[ActiveSessionActivity] = []
+
+
 class SessionStatusResponse(BaseModel):
     """Body for ``GET /sessions/{session_id}``.
 

@@ -46,6 +46,7 @@ from decimal import Decimal
 from typing import Any, Final, Protocol
 
 import structlog
+from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from agentforge_redteam.judge.deterministic_checks import evaluate_deterministic_check
@@ -61,7 +62,7 @@ logger = structlog.get_logger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL: Final[str] = "claude-sonnet-4-20250514"
+DEFAULT_MODEL: Final[str] = "claude-sonnet-4-6"
 
 # Confidence tiers for the skeleton's deliberately-simple aggregation rule.
 # Tunable in a later task once we have a real ground-truth pinning corpus.
@@ -164,6 +165,42 @@ class _LLMCheckOutcome:
     errored: bool
 
 
+def _extract_json_blob(raw_text: str) -> str | None:
+    """Best-effort extraction of a JSON object from a possibly-wrapped string.
+
+    Claude models (Sonnet 4.6 especially) frequently wrap JSON in markdown
+    code fences (```json … ```) or prefix it with chatter ("Here's my
+    evaluation: { … }"). Strict ``json.loads`` on the raw output fails on
+    those shapes. This helper:
+
+    1. Strips a leading ```json``` (or bare ``` ```) and matching trailing fence.
+    2. Falls back to slicing from the first ``{`` to the last matching ``}``.
+
+    Returns the candidate JSON substring, or ``None`` if no plausible JSON
+    blob exists in the input. The caller still runs ``json.loads`` on the
+    result and handles errors — this helper is intentionally permissive but
+    not validating.
+    """
+    text = raw_text.strip()
+    if text.startswith("```"):
+        # Drop the opening fence line (e.g. ```json\n) up to first newline.
+        nl = text.find("\n")
+        if nl > 0:
+            text = text[nl + 1 :]
+        # Drop the trailing fence.
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    # Even after fence-stripping, the LLM may have wrapped the JSON in
+    # commentary. The first ``{`` paired with the last ``}`` is a robust
+    # extractor for the simple-object shape this prompt asks for.
+    first = text.find("{")
+    last = text.rfind("}")
+    if first >= 0 and last > first:
+        return text[first : last + 1]
+    return None
+
+
 def _parse_llm_outcome(raw_text: str, *, check_name: str) -> tuple[bool, list[str], bool]:
     """Parse the LLM's JSON-encoded verdict for one check.
 
@@ -173,8 +210,15 @@ def _parse_llm_outcome(raw_text: str, *, check_name: str) -> tuple[bool, list[st
     silently inflate verdicts. The ``errored`` flag feeds the
     "inconclusive when more than half of LLM checks errored" rule.
     """
+    blob = _extract_json_blob(raw_text)
+    if blob is None:
+        logger.warning(
+            "judge.llm_check_no_json_blob",
+            check_name=check_name,
+        )
+        return False, [], True
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(blob)
     except (json.JSONDecodeError, ValueError):
         logger.warning(
             "judge.llm_check_malformed_json",
@@ -190,16 +234,64 @@ def _parse_llm_outcome(raw_text: str, *, check_name: str) -> tuple[bool, list[st
         )
         return False, [], True
 
-    hit_raw = parsed.get("hit", False)
-    if not isinstance(hit_raw, bool):
+    # The Judge system prompt (prompts/judge.md) asks the LLM to emit the
+    # *overall* verdict shape — ``{verdict, confidence, evidence_refs, notes}``
+    # — for each call, since each call evaluates the whole attack against the
+    # rubric. The original skeleton design used per-check ``{hit, evidence}``.
+    # We accept BOTH schemas so the parser is forward- and back-compatible:
+    #
+    # * If ``hit`` is present (per-check shape) -> use it directly.
+    # * Else if ``verdict`` is present (overall shape) -> map
+    #     pass / partial -> hit=True, fail -> hit=False, inconclusive -> errored.
+    #   Evidence is read from ``evidence_refs`` (overall) or ``evidence``
+    #   (per-check), whichever exists.
+    if "hit" in parsed:
+        hit_raw = parsed.get("hit", False)
+        if not isinstance(hit_raw, bool):
+            logger.warning(
+                "judge.llm_check_hit_not_bool",
+                check_name=check_name,
+                value_type=type(hit_raw).__name__,
+            )
+            return False, [], True
+        evidence_key = "evidence"
+        hit = hit_raw
+        errored = False
+    elif "verdict" in parsed:
+        verdict_raw = parsed.get("verdict", "")
+        if not isinstance(verdict_raw, str):
+            logger.warning(
+                "judge.llm_check_verdict_not_str",
+                check_name=check_name,
+                value_type=type(verdict_raw).__name__,
+            )
+            return False, [], True
+        verdict_normalized = verdict_raw.strip().lower()
+        if verdict_normalized in ("pass", "partial"):
+            hit = True
+            errored = False
+        elif verdict_normalized == "fail":
+            hit = False
+            errored = False
+        elif verdict_normalized == "inconclusive":
+            hit = False
+            errored = True
+        else:
+            logger.warning(
+                "judge.llm_check_unknown_verdict",
+                check_name=check_name,
+                verdict=verdict_normalized,
+            )
+            return False, [], True
+        evidence_key = "evidence_refs"
+    else:
         logger.warning(
-            "judge.llm_check_hit_not_bool",
+            "judge.llm_check_missing_hit_and_verdict",
             check_name=check_name,
-            value_type=type(hit_raw).__name__,
         )
         return False, [], True
 
-    evidence_raw = parsed.get("evidence", [])
+    evidence_raw = parsed.get(evidence_key, [])
     if not isinstance(evidence_raw, list):
         logger.warning(
             "judge.llm_check_evidence_not_list",
@@ -210,7 +302,7 @@ def _parse_llm_outcome(raw_text: str, *, check_name: str) -> tuple[bool, list[st
     else:
         evidence_list = [str(item) for item in evidence_raw]
 
-    return hit_raw, evidence_list, False
+    return hit, evidence_list, errored
 
 
 def _dedup_truncate(evidence: list[str]) -> list[str]:
@@ -433,6 +525,65 @@ async def judge_node(
         model_version=model,
         prompt_sha=loaded_prompt.sha256,
     )
+
+    # ---- 7b. Eagerly persist to the ``verdicts`` table. -----------------
+    # Same rationale as the red_team agent's attack persistence: the web UI
+    # reads from the SQL tables, not LangGraph state, so we INSERT mid-run
+    # so the operator can watch verdicts land in real time. We also UPSERT
+    # into ``coverage_matrix`` here so the Coverage tab populates without
+    # waiting for a separate denormalization pass.
+    try:
+        with engine.begin() as conn:
+            # ``INSERT OR IGNORE`` — same idempotency rationale as the
+            # red_team agent's attack insert. Test fixtures that pre-seed
+            # verdicts under the old "nodes don't persist" contract keep
+            # working; production retries become no-ops.
+            conn.execute(
+                text(
+                    "INSERT OR IGNORE INTO verdicts "
+                    "(verdict_id, attack_id, verdict, confidence, "
+                    "evidence_refs, rubric_sha, model_version, prompt_sha) "
+                    "VALUES (:vid, :aid, :v, :c, :ev, :rsha, :mv, :psha)"
+                ),
+                {
+                    "vid": str(verdict_record.verdict_id),
+                    "aid": str(verdict_record.attack_id),
+                    "v": verdict_record.verdict,
+                    "c": float(verdict_record.confidence),
+                    "ev": json.dumps(verdict_record.evidence_refs),
+                    "rsha": verdict_record.rubric_sha,
+                    "mv": verdict_record.model_version,
+                    "psha": verdict_record.prompt_sha or "",
+                },
+            )
+            # Coverage matrix upsert — composite PK (category, sub_attack).
+            # SQLite ``INSERT ... ON CONFLICT DO UPDATE`` is the idempotent
+            # form. We bump the lifetime + 7-day counters and stamp the
+            # last_run_at on every verdict. The orchestrator's separate
+            # denormalization step (when it runs) refines avg_cost_cents,
+            # findings_by_severity, and coverage_score; those columns
+            # default sanely so the UI's Coverage view renders correctly
+            # even before the denorm step has run.
+            conn.execute(
+                text(
+                    "INSERT INTO coverage_matrix "
+                    "(category, sub_attack, runs_last_7d, runs_lifetime, "
+                    "last_run_at) "
+                    "VALUES (:cat, :sub, 1, 1, CURRENT_TIMESTAMP) "
+                    "ON CONFLICT(category, sub_attack) DO UPDATE SET "
+                    "runs_lifetime = runs_lifetime + 1, "
+                    "runs_last_7d = runs_last_7d + 1, "
+                    "last_run_at = CURRENT_TIMESTAMP"
+                ),
+                {
+                    "cat": campaign.category,
+                    "sub": campaign.sub_attack,
+                },
+            )
+    except Exception:
+        # Persistence failure must not crash the judge — state in memory
+        # is still the source of truth for the in-flight run.
+        pass
 
     # ---- 8. Canary check (post-append so the audit trail captures it). --
     new_verdicts = [*state.verdict_records, verdict_record]

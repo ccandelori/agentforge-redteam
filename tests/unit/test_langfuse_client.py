@@ -77,7 +77,17 @@ class _FakeLangfuseSDK:
         self.flush_count: int = 0
         _FakeLangfuseSDK.last_constructed = self
 
-    def span(self, **kwargs: Any) -> _FakeSpan:
+    def create_trace_id(self, *, seed: str) -> str:
+        # Echo the seed back as an opaque deterministic string so tests
+        # can pin the wrapper's trace_context shape without recomputing
+        # the SDK's W3C hash. The real SDK returns a 32-char hex; the
+        # wrapper treats it as opaque.
+        return f"trace:{seed}"
+
+    def start_observation(self, **kwargs: Any) -> _FakeSpan:
+        # Langfuse 4.x replaced ``.span(...)`` with
+        # ``start_observation(as_type="span", trace_context=...)``. The
+        # wrapper does the translation; we record exactly what it sends.
         self.span_calls.append(kwargs)
         return _FakeSpan(**kwargs)
 
@@ -251,8 +261,18 @@ def test_real_client_span_delegates_to_sdk(
     span = client.span(name="step-42", trace_id="t-42", input={"a": 1}, metadata=None)
     last = fake_langfuse_module.last_constructed
     assert last is not None
+    # The wrapper translates the v2-style (name, trace_id, input, metadata)
+    # call into the v4-style start_observation call: as_type="span" and
+    # trace_id wrapped in a TraceContext-shaped dict (passed to the SDK
+    # as a plain dict, since TraceContext is a TypedDict at runtime).
     assert last.span_calls == [
-        {"name": "step-42", "trace_id": "t-42", "input": {"a": 1}, "metadata": None}
+        {
+            "name": "step-42",
+            "as_type": "span",
+            "input": {"a": 1},
+            "metadata": None,
+            "trace_context": {"trace_id": "trace:t-42"},
+        }
     ]
     # The returned object structurally satisfies LangfuseSpanLike.
     span.update(output={"ok": True})

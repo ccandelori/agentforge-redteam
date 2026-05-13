@@ -174,7 +174,7 @@ def test_empty_env_compiles_with_all_fallbacks(engine: Engine) -> None:
     assert config.has_anthropic is False
     assert config.has_gitlab is False
     assert config.has_langfuse is False
-    assert config.target_url == "https://143.244.157.90"
+    assert config.target_url == "https://143.244.157.90:9300/dashboard/turn"
 
 
 # ---------------------------------------------------------------------------

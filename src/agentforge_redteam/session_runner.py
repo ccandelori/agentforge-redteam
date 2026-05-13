@@ -269,7 +269,15 @@ def run_session(
         # the event loop while awaiting LLM responses. ``asyncio.run`` is
         # the right entry point because the session runner is itself a
         # script-style call site without an existing event loop.
-        recursion_limit = 4 * max_campaigns + 4
+        # Each campaign actually traverses more than the 4-node minimum cycle:
+        # the orchestrator can attempt multiple attacks per (category, sub_attack)
+        # before switching campaigns, and the doc-agent hop adds one node on
+        # passing verdicts. Empirically a campaign uses ~6-10 graph hops, so
+        # we budget 20 hops per campaign + 20 head-room. The real safety
+        # backstops are the per-session and per-campaign cost caps, not this
+        # recursion ceiling — the limit just protects against a logic bug
+        # in the routing fns that would otherwise loop forever.
+        recursion_limit = 20 * max_campaigns + 20
         result = asyncio.run(app.ainvoke(initial, config={"recursion_limit": recursion_limit}))
         final_state = _coerce_state(result)
 

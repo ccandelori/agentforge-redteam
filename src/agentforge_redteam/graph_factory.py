@@ -240,32 +240,159 @@ class _StubAnthropicDocLLM:
 
 
 class HTTPTargetClient:
-    """Simple :mod:`httpx`-based implementation of :class:`HTTPTargetClientLike`.
+    """:mod:`httpx`-based implementation of :class:`HTTPTargetClientLike`.
 
-    POSTs the payload as JSON ``{"payload": ...}`` to ``url`` and returns a
-    :class:`TargetResponse`. The ``target_sha`` is read from the response's
-    ``X-Target-SHA`` header when present; otherwise the literal string
-    ``"unknown"`` is used so the recorded ``AttackRecord.target_sha`` remains
-    non-empty (Pydantic ``min_length=1`` would reject empty otherwise).
+    Supports two payload modes, picked at construction time:
 
-    The client opens a fresh :class:`httpx.AsyncClient` per call so connection
-    state cannot leak between campaigns. The Red Team node already runs one
-    POST per invocation, so the per-call open is the right cost trade.
+    * **Generic mode** (default): POSTs JSON ``{"payload": ...}`` and returns
+      the raw response body. Used for tests, mock targets, and any target
+      whose API contract is "POST a payload, get a response back."
+    * **AgentForge Co-Pilot mode**: when ``AGENTFORGE_JWT_SECRET`` is in env,
+      the client mints a short-lived HS256 JWT carrying the legacy claim
+      shape (issuer ``openemr-agentforge``, ``sub`` / ``patient_id`` /
+      ``username`` / ``role``), sends ``{"message": payload}``, and parses
+      the SSE response to extract the assistant's final text. This lets us
+      attack the deployed sidecar at https://<droplet>:9300/dashboard/turn
+      without going through the full OAuth dashboard flow.
+
+    The ``target_sha`` field is read from ``X-Target-SHA`` header when
+    present; ``"unknown"`` is the fallback so the recorded
+    ``AttackRecord.target_sha`` stays non-empty (Pydantic ``min_length=1``).
+
+    The client opens a fresh :class:`httpx.AsyncClient` per call so
+    connection state cannot leak between campaigns. The Red Team node runs
+    one POST per invocation, so per-call open is the right cost trade.
+
+    TLS verification defaults to **off**. We are attacking the target, not
+    trusting it — a target serving a self-signed or expired cert is a
+    normal state of the world for a red-team subject. Operators who want
+    strict verification can pass ``verify_tls=True``.
     """
 
-    __slots__ = ("_timeout_s",)
+    __slots__ = (
+        "_jwt_secret",
+        "_patient_id",
+        "_role",
+        "_timeout_s",
+        "_user_id",
+        "_username",
+        "_verify_tls",
+    )
 
-    def __init__(self, *, timeout_s: float = 30.0) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_s: float = 30.0,
+        verify_tls: bool = False,
+        jwt_secret: str | None = None,
+        patient_id: int = 1,
+        user_id: int = 1,
+        username: str = "admin",
+        role: str = "physician",
+    ) -> None:
         self._timeout_s = timeout_s
+        self._verify_tls = verify_tls
+        self._jwt_secret = jwt_secret
+        self._patient_id = patient_id
+        self._user_id = user_id
+        self._username = username
+        self._role = role
+
+    def _mint_agentforge_jwt(self) -> str:
+        """Mint a 5-minute HS256 JWT matching the sidecar's legacy claim shape.
+
+        Mirrors ``InternalJwtMinter.mint`` in
+        ``sidecar/src/agentforge/dashboard_auth/internal_jwt.py`` byte-for-byte
+        — issuer, TTL, claim names, all identical. Drift between the two would
+        manifest as 401 from the sidecar.
+        """
+        import time
+
+        import jwt as _jwt
+
+        assert self._jwt_secret is not None
+        iat = int(time.time())
+        payload: dict[str, object] = {
+            "iss": "openemr-agentforge",
+            "iat": iat,
+            "exp": iat + 300,
+            "sub": str(self._user_id),
+            "patient_id": self._patient_id,
+            "username": self._username,
+            "role": self._role,
+            "breakglass_flag": False,
+            "breakglass_reason": None,
+        }
+        return _jwt.encode(payload, self._jwt_secret, algorithm="HS256")
+
+    @staticmethod
+    def _parse_sse_text(body: str) -> str:
+        """Concatenate ``text`` deltas from an SSE response stream.
+
+        The sidecar emits frames of two shapes:
+
+        * ``data: {"text": "..."}`` — token (or buffered chunk) of the reply.
+        * ``data: {"final": true, "stop_reason": ..., "cost_usd": ...}`` — the
+          final frame; no ``text`` field.
+
+        Plus a literal ``data: [DONE]`` terminator. We join every ``text``
+        we find in document order and return the concatenation. Any frame
+        we can't parse as JSON is silently skipped (logged at debug level
+        upstream).
+        """
+        import json as _json
+
+        out: list[str] = []
+        for line in body.splitlines():
+            if not line.startswith("data:"):
+                continue
+            payload = line[len("data:") :].strip()
+            if payload == "[DONE]" or not payload:
+                continue
+            try:
+                obj = _json.loads(payload)
+            except (ValueError, _json.JSONDecodeError):
+                continue
+            if isinstance(obj, dict) and isinstance(obj.get("text"), str):
+                out.append(obj["text"])
+        return "".join(out)
 
     async def post(self, *, url: str, payload: str, timeout_s: float) -> TargetResponse:
-        """POST ``payload`` to ``url`` and adapt to a :class:`TargetResponse`."""
+        """POST ``payload`` to ``url`` and adapt to a :class:`TargetResponse`.
+
+        Picks AgentForge mode iff ``self._jwt_secret`` is set; otherwise
+        falls back to the generic ``{"payload": …}`` shape.
+        """
         effective_timeout = timeout_s if timeout_s > 0 else self._timeout_s
-        async with httpx.AsyncClient(timeout=effective_timeout) as client:
-            resp = await client.post(url, json={"payload": payload})
+        if self._jwt_secret:
+            token = self._mint_agentforge_jwt()
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+            }
+            request_body: dict[str, object] = {"message": payload}
+        else:
+            headers = {"Content-Type": "application/json"}
+            request_body = {"payload": payload}
+
+        async with httpx.AsyncClient(timeout=effective_timeout, verify=self._verify_tls) as client:
+            resp = await client.post(url, json=request_body, headers=headers)
+
+        # If the response looks like SSE (Content-Type or body starts with
+        # ``data:``), distill it into a single assistant-text string so the
+        # Judge sees a coherent target_response.
+        body = resp.text
+        if self._jwt_secret and (
+            resp.headers.get("content-type", "").startswith("text/event-stream")
+            or body.lstrip().startswith("data:")
+        ):
+            distilled = self._parse_sse_text(body)
+            if distilled:
+                body = distilled
+
         return TargetResponse(
             status_code=resp.status_code,
-            body=resp.text,
+            body=body,
             target_sha=resp.headers.get("x-target-sha", "unknown"),
         )
 
@@ -521,7 +648,16 @@ def build_production_graph(
         anthropic_client if anthropic_client is not None else _StubAnthropicDocLLM()
     )
 
-    http: HTTPTargetClientLike = http_client if http_client is not None else HTTPTargetClient()
+    # Default HTTP target client wires the AgentForge Co-Pilot JWT secret
+    # from env when present. The env var lets operators point at the live
+    # sidecar (which requires a Bearer JWT) without code changes; when the
+    # var is absent the client falls back to the generic {"payload": ...}
+    # shape suitable for tests + mock targets.
+    if http_client is not None:
+        http: HTTPTargetClientLike = http_client
+    else:
+        jwt_secret_env = (env or os.environ).get("AGENTFORGE_JWT_SECRET", "").strip() or None
+        http = HTTPTargetClient(jwt_secret=jwt_secret_env)
     eng: Engine = engine if engine is not None else create_platform_engine()
     rng_instance: random.Random = rng if rng is not None else random.Random()
 

@@ -187,16 +187,18 @@ def _persist_attack_and_verdict(
 ) -> None:
     """Insert ``attacks`` and ``verdicts`` rows so the ``findings`` FK holds.
 
-    The Red Team and Judge nodes operate on the in-memory
-    :class:`PlatformState` and never write to ``attacks`` / ``verdicts``
-    themselves — that persistence is a separate concern owned by the
-    graph layer. This test stitches the two halves together so the Doc
-    Agent's ``INSERT INTO findings`` finds its FK targets present.
+    Historical note: the Red Team and Judge nodes used to operate purely
+    in-memory; this helper backfilled the rows so the Doc Agent's
+    ``INSERT INTO findings`` FK lookup succeeded. The nodes now eagerly
+    persist themselves, so this helper's INSERTs are usually redundant
+    duplicates — ``INSERT OR IGNORE`` keeps the helper backwards-compatible
+    (still works when called before the agents have persisted) while not
+    fighting the agents when they have.
     """
     with engine.begin() as conn:
         conn.execute(
             sa.text(
-                "INSERT INTO attacks "
+                "INSERT OR IGNORE INTO attacks "
                 "(attack_id, campaign_id, payload, target_response, target_sha, "
                 "status_code, latency_ms) "
                 "VALUES (:attack_id, :campaign_id, :payload, :target_response, "
@@ -214,7 +216,7 @@ def _persist_attack_and_verdict(
         )
         conn.execute(
             sa.text(
-                "INSERT INTO verdicts "
+                "INSERT OR IGNORE INTO verdicts "
                 "(verdict_id, attack_id, verdict, confidence, evidence_refs, "
                 "rubric_sha, model_version, prompt_sha) "
                 "VALUES (:verdict_id, :attack_id, :verdict, :confidence, "

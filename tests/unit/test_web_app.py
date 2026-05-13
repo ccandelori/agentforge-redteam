@@ -246,7 +246,41 @@ def test_healthz_returns_ok(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_start_session_happy_path(client: TestClient, migrated_engine: Engine) -> None:
+def test_start_session_happy_path(
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # POST /sessions/start schedules ``_dispatch_session`` as a FastAPI
+    # BackgroundTask. The real dispatcher invokes ``run_session`` which
+    # spins up the LangGraph + LLM stack — far out of scope for a web-layer
+    # test. We stub it to just write a placeholder manifest row so the
+    # post-condition (operator can GET the session afterward) still holds.
+    captured: list[tuple[str, str, int, tuple[str, ...]]] = []
+
+    def fake_dispatch(
+        session_id: str,
+        target_alias: str,
+        cost_cap_cents: int,
+        categories: tuple[str, ...],
+    ) -> None:
+        captured.append((session_id, target_alias, cost_cap_cents, categories))
+        with migrated_engine.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO run_manifests "
+                    "(session_id, target_sha, prompt_set_sha, rubric_set_sha, "
+                    "attack_library_sha, policy_sha, cost_cap_cents) "
+                    "VALUES (:sid, 'pending', 'pending', 'pending', 'pending', 'pending', :cap)"
+                ),
+                {"sid": session_id, "cap": cost_cap_cents},
+            )
+
+    monkeypatch.setattr(
+        "agentforge_redteam.web.app._dispatch_session",
+        fake_dispatch,
+    )
+
     resp = client.post(
         "/sessions/start",
         json={
@@ -258,6 +292,9 @@ def test_start_session_happy_path(client: TestClient, migrated_engine: Engine) -
     assert resp.status_code == 200, resp.text
     session_id = resp.json()["session_id"]
     assert uuid.UUID(session_id)
+
+    # The bg task ran (TestClient drains BackgroundTasks before returning).
+    assert captured == [(session_id, "clinical-copilot", 5000, ("prompt-injection-direct",))]
 
     with migrated_engine.connect() as conn:
         row = conn.execute(
@@ -280,7 +317,35 @@ def test_start_session_rejects_invalid_body(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
-def test_get_session_existing(client: TestClient) -> None:
+def test_get_session_existing(
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Same fake-dispatch trick — write a placeholder manifest row so the
+    # follow-up GET has something to return.
+    def fake_dispatch(
+        session_id: str,
+        target_alias: str,
+        cost_cap_cents: int,
+        categories: tuple[str, ...],
+    ) -> None:
+        with migrated_engine.begin() as conn:
+            conn.execute(
+                sa.text(
+                    "INSERT INTO run_manifests "
+                    "(session_id, target_sha, prompt_set_sha, rubric_set_sha, "
+                    "attack_library_sha, policy_sha, cost_cap_cents) "
+                    "VALUES (:sid, 'pending', 'pending', 'pending', 'pending', 'pending', :cap)"
+                ),
+                {"sid": session_id, "cap": cost_cap_cents},
+            )
+
+    monkeypatch.setattr(
+        "agentforge_redteam.web.app._dispatch_session",
+        fake_dispatch,
+    )
+
     created = client.post(
         "/sessions/start",
         json={
