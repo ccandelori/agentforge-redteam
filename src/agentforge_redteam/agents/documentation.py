@@ -500,7 +500,13 @@ async def documentation_node(
         gitlab_issue_id=gitlab_issue_id,
     )
 
-    new_cost = state.cost_so_far + Decimal(llm_call.cost_cents)
+    # cost_so_far is in DOLLARS (Decimal); cost_cents is in cents.
+    # Bug prior to 2026-05-13: this added Decimal(cents) directly to
+    # dollars, inflating state.cost_so_far by 100x on every doc-agent
+    # call. Other agents (red_team/judge/orchestrator) all do the
+    # ``Decimal(cents) / Decimal(100)`` conversion. See BUG_LEDGER.md.
+    delta_dollars = Decimal(llm_call.cost_cents) / Decimal(100)
+    new_cost = state.cost_so_far + delta_dollars
     return state.model_copy(
         update={
             "confirmed_findings": [*state.confirmed_findings, confirmed],

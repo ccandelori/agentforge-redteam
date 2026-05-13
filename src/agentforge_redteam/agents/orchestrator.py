@@ -83,6 +83,14 @@ _AGENT_NAME: Final[str] = "orchestrator"
 # on the exact strings rather than parsing free text.
 HALT_KILL_SWITCH: Final[str] = "kill_switch_tripped"
 HALT_BUDGET: Final[str] = "budget_exhausted"
+
+# Per-finding doc-agent cost reserve held back from the budget gate so
+# a finding landing in the last campaign before halt doesn't push total
+# spend over the cap. Calibrated from session e2590f4c measured
+# 2.5¢/finding (Sonnet) and ebd35d75 measured 0.5¢/finding (Haiku);
+# 5¢ is the conservative side and is still under 7% of a typical
+# 75¢ session cap.
+_DOC_AGENT_RESERVE_CENTS: Final[int] = 5
 HALT_NO_CANDIDATES: Final[str] = "no_candidates"
 # Task 37 additions. ``HALT_CANARY_FAILED`` is the value the Judge agent
 # stamps on ``state.halt_reason`` when a canary's verdict diverges from
@@ -489,8 +497,22 @@ async def orchestrator_node(
     # ``cost_so_far`` is stored in dollars (Decimal). We compare in cents
     # against the policy's integer cap so the per-cent rounding stays
     # honest.
+    #
+    # Reserve includes:
+    #   default_campaign_budget_cents: full budget for the next campaign
+    #     (red_team mutation + target POST + 3-5 judge checks).
+    #   _DOC_AGENT_RESERVE_CENTS: a follow-on doc-agent call that fires
+    #     AFTER the orchestrator returns if the next campaign produces a
+    #     pass verdict. Without this, sessions can land 5-10¢ over the
+    #     cap when a finding lands in the last campaign before halt.
+    #     See BUG_LEDGER.md ("Cost cap leakage") and live overshoot
+    #     observed in session f044fd18 ($0.75 cap → $1.16 actual).
     cost_so_far_cents = int(state.cost_so_far * Decimal(100))
-    projected = cost_so_far_cents + policy.default_campaign_budget_cents
+    projected = (
+        cost_so_far_cents
+        + policy.default_campaign_budget_cents
+        + _DOC_AGENT_RESERVE_CENTS
+    )
     if projected > policy.max_session_cost_cents:
         return _halt(state, HALT_BUDGET)
 

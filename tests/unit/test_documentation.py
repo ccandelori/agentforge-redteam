@@ -577,7 +577,12 @@ async def test_state_cost_so_far_increases_by_llm_cost(engine: Engine) -> None:
         rubric_outcomes={},
     )
 
-    assert new_state.cost_so_far == state.cost_so_far + Decimal(375)
+    # cost_so_far is DOLLARS, llm_call.cost_cents is CENTS. 375¢ = $3.75.
+    # The assertion previously expected += Decimal(375) which was pinning
+    # a 100x-overstatement bug in place — fixed alongside the production
+    # code change in agents/documentation.py:503. See BUG_LEDGER.md
+    # "Cost cap leakage" entry.
+    assert new_state.cost_so_far == state.cost_so_far + Decimal("3.75")
 
 
 async def test_confirmed_findings_grows_by_exactly_one(engine: Engine) -> None:
