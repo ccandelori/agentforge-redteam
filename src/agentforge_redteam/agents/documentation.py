@@ -55,7 +55,7 @@ from agentforge_redteam.tools.wrapper import call_tool
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL: Final[str] = "claude-sonnet-4-20250514"
+DEFAULT_MODEL: Final[str] = "claude-sonnet-4-6"
 AUTOFILE_CONFIDENCE_THRESHOLD: Final[float] = 0.7
 """Verdicts below this confidence go to the human queue regardless of severity."""
 
@@ -164,6 +164,32 @@ _REQUIRED_LLM_KEYS: Final[tuple[str, ...]] = (
 )
 
 
+def _strip_markdown_json_fence(text: str) -> str:
+    """Strip a leading `````json``-fence wrapper if present.
+
+    Claude Sonnet 4.6 routinely wraps its JSON output in markdown code
+    fences even when the prompt asks for raw JSON. We pre-strip the fence
+    here so the strict JSON parser below succeeds without us having to
+    teach every caller to know about Claude's formatting habit.
+
+    Falls back to slicing from the first ``{`` to the last ``}`` if the
+    fence shape doesn't match — handles preambles like "Here's the JSON:".
+    """
+    s = text.strip()
+    if s.startswith("```"):
+        nl = s.find("\n")
+        if nl > 0:
+            s = s[nl + 1 :]
+        if s.endswith("```"):
+            s = s[:-3]
+        s = s.strip()
+    first = s.find("{")
+    last = s.rfind("}")
+    if first >= 0 and last > first:
+        return s[first : last + 1]
+    return s
+
+
 def _parse_llm_response_to_sections(text: str) -> dict[str, Any]:
     """Parse the LLM's drafted JSON envelope into the report-template fields.
 
@@ -173,7 +199,7 @@ def _parse_llm_response_to_sections(text: str) -> dict[str, Any]:
     human reviewer notices immediately.
     """
     try:
-        payload = json.loads(text)
+        payload = json.loads(_strip_markdown_json_fence(text))
     except json.JSONDecodeError as exc:
         raise ValueError(f"LLM response is not valid JSON: {exc}") from exc
 
