@@ -15,7 +15,8 @@ campaign), which is operator-led and is not captured in repo artifacts today.
 
 If you are reviewing this repo for MVP-gate evidence, read this file as the boundary
 between "the wiring is right" (the smokes prove that) and "the wiring fires against a real
-target" (operator must demonstrate that separately).
+target" (operator must demonstrate that separately). The deployed operator UI for that
+demonstration lives at **`https://104-248-232-22.sslip.io/ui/`** (`/healthz` returns 200).
 
 ---
 

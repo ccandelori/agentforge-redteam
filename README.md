@@ -21,18 +21,15 @@ cadence; this platform produces the evidentiary audit trail that can.
 
 ## Status
 
-Active development. MVP gate **2026-05-12**, Final gate **2026-05-15**.
+MVP shipped **2026-05-12**. Demo-prep underway. Final gate **2026-05-15**.
 
-## MVP Status
-
-> **Operator action required to clear the MVP gate:**
-> 1. Run `agentforge-redteam queue list` to see pending high-severity findings.
-> 2. Manually file ≥1 finding to the AgentForge GitLab project (project ID set via `GITLAB_PROJECT_ID`).
-> 3. Replace the `<MVP_GITLAB_ISSUE_URL>` placeholder below with the issue URL.
-
-- **Deployed target:** `https://143.244.157.90`
-- **Filed finding:** `<MVP_GITLAB_ISSUE_URL>` (to be replaced after operator filing)
-- **Local fallback:** when GitLab credentials are absent, the Documentation Agent writes rendered reports to `findings/<title>-<n>.md` via `LocalFindingsSink`.
+- **Deployed platform (operator UI):** [`https://104-248-232-22.sslip.io/ui/`](https://104-248-232-22.sslip.io/ui/) — TLS via Let's Encrypt, BasicAuth-protected. `/healthz` returns `200`.
+- **Deployed target under test:** `https://143.244.157.90` (AgentForge Clinical Co-Pilot, built in Weeks 1–2).
+- **Polished findings (committed):**
+  [`findings/data_exfiltration_cross_patient_phi_disclosure_polished.md`](./findings/data_exfiltration_cross_patient_phi_disclosure_polished.md),
+  [`findings/indirect_prompt_injection_citation_fabrication_polished.md`](./findings/indirect_prompt_injection_citation_fabrication_polished.md),
+  [`findings/tool_misuse_unauthorized_chart_write_polished.md`](./findings/tool_misuse_unauthorized_chart_write_polished.md).
+- **Documentation Agent sink:** GitLab when `GITLAB_TOKEN`+`GITLAB_PROJECT_ID` are set, else `LocalFindingsSink` writing to `findings/<title>-<n>.md`. The polished reports above are the local-sink output.
 
 ## Architecture at a glance
 
@@ -62,9 +59,7 @@ uv run alembic upgrade head                # creates var/platform.db
 
 ## Usage
 
-> **Planned CLI (not yet implemented).** The commands below describe the operator surface
-> wired up in a later task. Until then, the platform is exercised through the test suite
-> and direct module imports.
+Operator CLI (installed by `uv sync`):
 
 - `agentforge-redteam start-session` — kick off a red-team session
 - `agentforge-redteam halt` — trip the kill switch
@@ -72,6 +67,10 @@ uv run alembic upgrade head                # creates var/platform.db
   the human-approval queue
 - `agentforge-redteam regress` — run the regression harness against the current target SHA
 - `agentforge-redteam eval-judge` — run Judge against the ground-truth set
+
+Most live operations are also exposed through the deployed operator UI at
+`https://104-248-232-22.sslip.io/ui/`. See [`docs/NEXT-SESSION.md`](./docs/NEXT-SESSION.md)
+for the canonical command list (deploy, smoke, trigger, watch).
 
 ## Development
 
@@ -116,23 +115,23 @@ The three categories seeded in [`attack_library.json`](./attack_library.json):
 - [`docs/SMOKE_TEST_COVERAGE.md`](./docs/SMOKE_TEST_COVERAGE.md) — what the integration smokes cover and the deliberate gaps (e.g., no live HTTP to the deployed target)
 - [`docs/COST_ANALYSIS.md`](./docs/COST_ANALYSIS.md) — per-run + at-scale cost projection (100 / 1K / 10K / 100K runs)
 
-## MVP Status (2026-05-12)
+## MVP Status (2026-05-13)
 
-- **Deployed target**: `https://143.244.157.90` (configured via `TARGET_DROPLET_URL`)
+- **Deployed platform (operator UI)**: `https://104-248-232-22.sslip.io/ui/` (TLS via Let's Encrypt, BasicAuth-protected)
+- **Deployed target under test**: `https://143.244.157.90` (configured via `TARGET_DROPLET_URL`)
 - **Hard-gate docs**: ARCHITECTURE.md, THREAT_MODEL.md, USERS.md, DEFENSE.md, DIAGRAMS.md, presearch.md (all committed)
-- **Schema**: 9 SQLite tables under Alembic management; ≥1 migration applied
-- **Agents**: 4 LangGraph nodes (Red Team / Judge / Orchestrator / Documentation) wired with Protocol-typed clients
+- **Schema**: SQLite tables under Alembic management; migrations applied
+- **Agents**: 4 LangGraph nodes (Red Team / Judge / Orchestrator / Documentation) wired with Protocol-typed clients via `graph_factory.build_production_graph`
 - **Rubrics**: 3 production rubric YAMLs (prompt-injection-indirect / data-exfiltration / tool-misuse) + 1 example fixture
-- **Attack library**: 15 hand-curated seed payloads, 5 per category
-- **Ground truth**: 30 hand-authored Judge cases
-- **Findings filing path**: GitLab-or-local-file fallback — see `findings/*.md`
-- **Test suite**: 500+ unit + integration tests, mypy strict, ruff clean
+- **Attack library**: 16 hand-curated seed payloads (5 data-exfiltration / 5 indirect-prompt-injection / 6 tool-misuse)
+- **Ground truth**: 30 hand-authored Judge cases (10 per category)
+- **Findings filing path**: GitLab-or-local-file fallback — 3 polished reports already in `findings/*_polished.md`
+- **Test suite**: 642 unit + integration tests, mypy strict, ruff clean
 
-**Operator follow-ups for MVP submission** (manual steps):
-1. Configure `GITLAB_TOKEN` and `GITLAB_PROJECT_ID` in `.env`
-2. Run `uv run agentforge-redteam queue approve <queue_id>` on one finding from the local store
-3. Screenshot the filed GitLab issue
-4. Push to GitLab and submit the deployed URL + issue URL to the gradebook
+**What's next**: see [`docs/NEXT-SESSION.md`](./docs/NEXT-SESSION.md) for the live ops
+runbook (deploy, smoke, trigger sessions, watch counters, tail logs) and the
+prioritized debt list. Demo recording and live-evidence packaging are the
+remaining open work for the final gate.
 
 ## License
 
