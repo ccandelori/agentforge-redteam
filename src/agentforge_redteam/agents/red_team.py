@@ -46,12 +46,14 @@ Design notes
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final, Protocol
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
@@ -68,6 +70,8 @@ from agentforge_redteam.prompts import PROMPTS_DIR, load_prompt
 from agentforge_redteam.redteam.content_filter import filter_payload
 from agentforge_redteam.state import AttackRecord, PlatformState
 from agentforge_redteam.tools.wrapper import call_tool
+
+logger = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -185,6 +189,40 @@ def _build_mutation_user_prompt(
     )
 
 
+def _parse_mutation_payload(raw_text: str) -> str:
+    """Extract the inner ``payload`` string from the Red Team LLM's JSON envelope.
+
+    ``prompts/redteam.md`` asks the LLM to emit
+    ``{"payload": "<the adversarial input>", "rationale": ..., "mutation_of_attack_id": ...}``.
+    Without this parser we send the entire envelope (``{"payload":...,
+    "rationale":..., ...}``) to the target as the attack body, which (a) is
+    not the attack the rubric is testing for and (b) trips structured-input
+    refusals that mask whether the real attack would have succeeded.
+
+    Tolerant of Claude's habit of wrapping JSON in markdown code fences
+    (```json ... ```) and of leading/trailing prose. Raises ``ValueError``
+    if no JSON object is recoverable or the ``payload`` field is missing /
+    not a string — caller decides the fallback.
+    """
+    text = raw_text.strip()
+    if text.startswith("```"):
+        nl = text.find("\n")
+        if nl > 0:
+            text = text[nl + 1 :]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    first = text.find("{")
+    last = text.rfind("}")
+    if first < 0 or last <= first:
+        raise ValueError("no JSON object in mutation response")
+    parsed = json.loads(text[first : last + 1])
+    payload = parsed.get("payload")
+    if not isinstance(payload, str):
+        raise ValueError("mutation JSON missing string 'payload' field")
+    return payload
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -242,7 +280,16 @@ async def red_team_node(
             langfuse=langfuse,
         )
         llm_response: LLMResponse = llm_call.result
-        payload = llm_response.text
+        try:
+            payload = _parse_mutation_payload(llm_response.text)
+        except (ValueError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "red_team.mutation_parse_failed",
+                seed_category=seed.category,
+                seed_sub_attack=seed.sub_attack,
+                error=str(exc),
+            )
+            payload = seed.payload
         llm_cost_cents = llm_response.cost_cents
     else:
         payload = seed.payload

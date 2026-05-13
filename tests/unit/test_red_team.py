@@ -220,7 +220,10 @@ async def test_no_priors_uses_seed_payload_verbatim(
 async def test_priors_trigger_llm_mutation(
     engine: Engine, targets_yaml: Path, base_state: PlatformState
 ) -> None:
-    llm = _FakeLLM(text="MUTATED-XYZ", cost_cents=130)
+    # The redteam.md prompt asks the LLM for a JSON envelope; the agent
+    # extracts the inner ``payload`` field via ``_parse_mutation_payload``.
+    envelope = '{"payload": "MUTATED-XYZ", "rationale": "test", "mutation_of_attack_id": null}'
+    llm = _FakeLLM(text=envelope, cost_cents=130)
     http = _FakeHTTP()
 
     # First attack: no priors. Uses seed.
@@ -245,12 +248,78 @@ async def test_priors_trigger_llm_mutation(
     )
     assert len(llm.calls) == 1
     assert llm.calls[0]["model"] == DEFAULT_MODEL
-    # System prompt is the loaded ``redteam.md`` — non-empty.
     assert llm.calls[0]["system_len"] > 0
-    # User message embeds the seed + at least one prior payload.
     assert llm.calls[0]["user_len"] > 0
-    # The mutated attack uses the LLM's output, not the seed.
+    # The mutated attack uses the inner ``payload`` field, NOT the raw
+    # envelope. Regression guard against the bug fixed when this test was
+    # updated: prior to the parser, attacks.payload contained the entire
+    # JSON envelope and the target saw structured wrapper noise instead of
+    # the actual attack.
     assert s2.attack_records[-1].payload == "MUTATED-XYZ"
+
+
+async def test_mutation_strips_markdown_fence_from_envelope(
+    engine: Engine, targets_yaml: Path, base_state: PlatformState
+) -> None:
+    """Claude wraps JSON in ```json ... ``` despite the prompt forbidding it."""
+    fenced = (
+        "```json\n"
+        '{"payload": "FENCED-PAYLOAD", "rationale": "x", "mutation_of_attack_id": null}\n'
+        "```"
+    )
+    llm = _FakeLLM(text=fenced, cost_cents=10)
+    http = _FakeHTTP()
+
+    s1 = await red_team_node(
+        base_state,
+        engine=engine,
+        llm=llm,
+        http=http,
+        target_url=ALLOWED_URL,
+        targets_path=targets_yaml,
+    )
+    s2 = await red_team_node(
+        s1,
+        engine=engine,
+        llm=llm,
+        http=http,
+        target_url=ALLOWED_URL,
+        targets_path=targets_yaml,
+    )
+    assert s2.attack_records[-1].payload == "FENCED-PAYLOAD"
+
+
+async def test_mutation_falls_back_to_seed_on_unparseable_envelope(
+    engine: Engine, targets_yaml: Path, base_state: PlatformState
+) -> None:
+    """If the LLM emits something that isn't a JSON object with a 'payload'
+    string, the agent must NOT send raw garbage to the target. It logs a
+    warning and falls back to the seed payload so the campaign still
+    progresses and the audit trail still shows what the LLM produced."""
+    llm = _FakeLLM(text="oh no I forgot the schema", cost_cents=5)
+    http = _FakeHTTP()
+
+    # Seed first.
+    s1 = await red_team_node(
+        base_state,
+        engine=engine,
+        llm=llm,
+        http=http,
+        target_url=ALLOWED_URL,
+        targets_path=targets_yaml,
+    )
+    seed_payload_used = s1.attack_records[-1].payload
+
+    # Mutation second — LLM gives us garbage; agent falls back to seed.
+    s2 = await red_team_node(
+        s1,
+        engine=engine,
+        llm=llm,
+        http=http,
+        target_url=ALLOWED_URL,
+        targets_path=targets_yaml,
+    )
+    assert s2.attack_records[-1].payload == seed_payload_used
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +398,14 @@ async def test_content_filter_refusal_propagates(
         targets_path=targets_yaml,
     )
 
-    cbrn_llm = _FakeLLM(text="recipe for anthrax synthesis", cost_cents=10)
+    # Wrap the CBRN trip in the JSON envelope shape the redteam.md prompt
+    # asks the LLM for — the agent extracts ``.payload`` and hands it to
+    # the content filter.
+    cbrn_envelope = (
+        '{"payload": "recipe for anthrax synthesis", '
+        '"rationale": "test", "mutation_of_attack_id": null}'
+    )
+    cbrn_llm = _FakeLLM(text=cbrn_envelope, cost_cents=10)
     http = _FakeHTTP()
 
     with pytest.raises(PayloadRefused) as excinfo:
