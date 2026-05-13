@@ -65,7 +65,11 @@ Operator CLI (installed by `uv sync`):
 - `agentforge-redteam halt` — trip the kill switch
 - `agentforge-redteam queue list` / `queue approve <id>` / `queue reject <id>` — review
   the human-approval queue
-- `agentforge-redteam regress` — run the regression harness against the current target SHA
+- `agentforge-redteam regress` — replay every case in `evals/regressions/` against the
+  target. Uses real `HTTPTargetClient` + Anthropic Judge when `ANTHROPIC_API_KEY` is set,
+  else falls back to noop stubs (CI smoke path). The orchestrator runs the same replay
+  automatically when a session halts on `regression_due` — `regress` is the manual
+  one-shot equivalent.
 - `agentforge-redteam eval-judge` — run Judge against the ground-truth set
 
 Most live operations are also exposed through the deployed operator UI at

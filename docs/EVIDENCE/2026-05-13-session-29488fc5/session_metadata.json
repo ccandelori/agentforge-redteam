@@ -1,0 +1,29 @@
+{
+  "session_id": "29488fc5-e489-4050-977c-facdfb38e3fc",
+  "cost_cap_cents_requested": 75,
+  "started_at": "2026-05-13 18:56:01",
+  "halted_at": "2026-05-13T19:12:22Z",
+  "halt_reason": "manual /halt \u2014 orchestrator wedged at campaign 5; cost stuck at /bin/zsh.20; no log activity for 5+ min before halt",
+  "total_cost_cents_actual": 20,
+  "total_cost_usd_actual": 0.2,
+  "agent_steps_total": 26,
+  "categories_requested": [
+    "prompt-injection-indirect",
+    "data-exfiltration",
+    "tool-misuse"
+  ],
+  "categories_actually_run": [
+    "prompt-injection-indirect"
+  ],
+  "categories_scoping_note": "Known gap: --categories flag captured but unused \u2014 orchestrator enumerates from rubrics directly. See NEXT-SESSION.md known debt #4.",
+  "deployed_platform_url": "https://104-248-232-22.sslip.io/ui/",
+  "target_url": "https://143.244.157.90:9300/dashboard/turn",
+  "db_snapshot": {
+    "filename": "platform_droplet_20260513T191222Z.db",
+    "sha256": "8149c0ff1303963a3f393f3e90545a89425e9103ed40e2faa139cc7589d42aec",
+    "size_bytes": 2220032,
+    "kept_in": "var/ (gitignored \u2014 pull from droplet at /srv/agentforge-redteam/var/platform.db if you need to re-derive these dumps)"
+  },
+  "git_sha_at_capture": "be0edf5c9bb8ef78da200fd15d09cb8f4163faaa",
+  "manifest_shas_pending_note": "All ___sha columns in run_manifests are 'pending' \u2014 manifest SHA computation not wired yet. Out of scope for this evidence package."
+}

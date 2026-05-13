@@ -1,6 +1,6 @@
 # Cost Analysis at Scale
 
-**Status:** projection-only. Live measurements pending Task 59 (deployed campaign).
+**Status:** projections **+ first measured session** (2026-05-13). Measured numbers come from session `29488fc5-e489-4050-977c-facdfb38e3fc` against the deployed platform. Dump in [`docs/EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json`](EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json). The projection sections below are unchanged; a new "Measured" subsection sits before the Honesty section.
 **Pricing snapshot:** 2026-05-12, per `src/agentforge_redteam/cost.py`'s `PRICING_TABLE`.
 **Audience:** operators planning capacity, reviewers grading the final gate's AI Cost Analysis requirement, and future-me at quarterly pricing-revalidation time.
 
@@ -44,7 +44,7 @@ Per-run cost ranges roughly **$0.05–$0.10** depending on payload size, mutatio
 
 At 100K platform runs, the linear projection ($2,830) lands in the low-four-figures. With the levers built into the architecture — Anthropic prompt caching on the Judge system prompt, batch API on non-canary verdicts, OpenRouter fallback at the Red Team layer, and epsilon-greedy payload deduplication — the **100K projection drops to ~$1,056**, sub-linear at scale.
 
-**This document is a projection, not a measurement.** Live numbers will follow Task 59. The token-per-call estimates are reasoned from prompt sizes, the 15-entry `attack_library.json`, and typical chat-completion response volumes; they are pinned by the deterministic per-step computation embedded at the bottom of this doc.
+**This document was originally a projection.** As of 2026-05-13 it includes a first measured session (see "Measured" section below). The token-per-call estimates remain reasoned from prompt sizes, the 16-entry `attack_library.json`, and typical chat-completion response volumes; they are pinned by the deterministic per-step computation embedded at the bottom of this doc and now cross-checked against `agent_steps.cost_cents` from the live run.
 
 ---
 
@@ -299,19 +299,56 @@ Already in the rubric schema: rubrics declare `type: deterministic` vs `type: ll
 
 ---
 
+## Measured: Session `29488fc5` (2026-05-13)
+
+First live run of the deployed platform against the AgentForge target. **5 campaigns ran end-to-end before the orchestrator wedged at $0.20** (wedge details in [`docs/EVIDENCE/2026-05-13-session-29488fc5/README.md`](EVIDENCE/2026-05-13-session-29488fc5/README.md)). All 5 campaigns ran the no-finding path — no Documentation Agent calls. Cost data below is therefore the **no-finding path measured**, with the finding-path lines still projected.
+
+### Per-agent measured spend
+
+Source: `SELECT agent, COUNT(*), SUM(cost_cents) FROM agent_steps WHERE session_id = '29488fc5-...' GROUP BY agent`.
+
+| Agent | Calls | Total cents | Cents / campaign | Avg latency |
+|---|---|---|---|---|
+| orchestrator | 5 | 5¢ | 1.0¢ | 1.30 s |
+| red_team | 6 | 0¢ | 0.0¢ | 5.98 s |
+| judge | 15 | 15¢ | 3.0¢ | 2.65 s |
+| documentation | 0 | 0¢ | — | — |
+| **Total** | **26** | **20¢** | **4.0¢** | — |
+
+### Projected vs measured (no-finding path)
+
+| Step | Projected (¢/campaign, quantized) | Measured (¢/campaign) | Delta |
+|---|---|---|---|
+| Orchestrator | 1¢ | 1¢ | 0 |
+| Red Team | 1¢ | 0¢ | **−1¢** (Red Team `cost_cents` reports 0 for `gpt-4o-2024-08-06` — known accounting gap, see NEXT-SESSION.md Known Debt #5) |
+| Judge | 4¢ (4 LLM checks) | 3¢ (3 LLM checks) | −1¢ (this session's rubric exercised 3 checks/campaign, matching the "MVP rubrics declare 2–3" caveat in §7 below) |
+| Documentation | — (no-finding path) | — | — |
+| **No-finding total** | **6¢/campaign** | **4¢/campaign** | **−2¢** |
+
+The 4¢/campaign measured matches the projection's no-finding-path math when (a) the Red Team `0¢` accounting gap is held constant and (b) the rubric uses 3 checks instead of the conservative 4 ceiling. Once #5 is fixed and rubrics grow toward the 4-check ceiling, expect the no-finding path to land at 5–6¢/campaign — within the projection band.
+
+### What we did NOT measure in this session
+
+- **Documentation Agent cost.** No findings landed in this session, so there were 0 doc-agent calls. The 1–2¢/finding projection (line 116) remains unchecked.
+- **Finding rate.** This session produced 0 findings (judge returned `verdict=fail` with empty `rubric_outcomes={}` for all 15 verdicts). The 10% projection assumption is therefore still pending. The platform's lifetime finding rate against this deployed target is currently 2 findings / 23 attacks across 2 sessions = **8.7%** (close to the projection's 10% midpoint).
+- **Cache hit rates.** Anthropic prompt-caching response headers were not captured in this run. Wiring this through `cost.py` is tracked separately.
+- **All 3 MVP categories.** Only `prompt-injection-indirect` ran due to the known `--categories` scoping gap (Known Debt #4). `data-exfiltration` and `tool-misuse` per-campaign cost is therefore still projection-only.
+
+---
+
 ## Honesty: Limitations and Caveats
 
 This section is the most important part of the doc. The numbers above are useful only to the extent these caveats are understood.
 
-### 1. Projection, not measurement
+### 1. Projection vs measurement
 
-**Live measurements are pending Task 59** (run live campaign against deployed target). Until then:
+As of 2026-05-13, **the no-finding-path cost is measured** (see "Measured" section above); the finding-filing path and the cost-at-scale table remain projections.
 
-- All per-step token counts are *reasoned* from prompt content + typical chat-completion volumes, not measured.
+- Per-step token counts are *reasoned* from prompt content + typical chat-completion volumes, not measured at the SDK-token-usage level — the cross-check above is at the `cost_cents` level only.
 - All savings multipliers (prompt-caching 30%, batch 50% on 80% of calls, OpenRouter 70% off RT, dedup 20%) are conservative-side estimates from provider docs; real campaigns may overshoot or undershoot.
-- The cost-at-scale table is **not** validated against a single real production run.
+- The cost-at-scale table extrapolates from a single small session. To validate at 100 / 1K / 10K, run a longer campaign and re-derive.
 
-When Task 59 lands, update this doc with: (a) measured per-step token counts from `agent_steps` SQLite rows, (b) measured cache hit rates from Anthropic's response headers, (c) actual finding rate from the campaign.
+Outstanding to-measure items: (a) per-step token counts from raw SDK usage, (b) Anthropic prompt-cache hit rate from response headers, (c) Documentation Agent per-finding cost, (d) finding rate over a sample large enough to be meaningful.
 
 ### 2. Token heuristic is ~15% optimistic
 
@@ -346,7 +383,7 @@ The cost-at-scale table assumes no rate-limit-induced retries. At 100K runs/mont
 
 ### 7. The MVP rubrics declare 2–3 LLM checks, not 4
 
-The headline figure assumes **4 LLM-typed Judge checks per rubric**. The MVP rubrics in `rubrics/*.yaml` declare 2–3. The 4-check projection is the conservative ceiling, anticipating rubric growth as the platform matures. With current MVP rubrics, the actual per-run cost is **~$0.06 worst case** rather than $0.08 — **25% cheaper than the headline.**
+The headline figure assumes **4 LLM-typed Judge checks per rubric**. The MVP rubrics in `rubrics/*.yaml` declare 2–3. The 4-check projection is the conservative ceiling, anticipating rubric growth as the platform matures. With current MVP rubrics, the actual per-run cost is **~$0.06 worst case** rather than $0.08 — **25% cheaper than the headline.** Confirmed empirically by the 2026-05-13 measured session: Judge ran 3 LLM checks per campaign (15 calls / 5 campaigns).
 
 ---
 
@@ -392,7 +429,7 @@ The headline figure assumes **4 LLM-typed Judge checks per rubric**. The MVP rub
 
 ### Source of truth for finding rate
 
-10% finding rate is an assumption pending Task 59. Historical seed campaigns against AgentForge (Week 2) trended toward 8–15% across the three MVP categories — the 10% mid-point is the planning assumption.
+10% finding rate is the planning assumption. Historical seed campaigns against AgentForge (Week 2) trended toward 8–15% across the three MVP categories — the 10% mid-point is the planning assumption. **Measured against the deployed target as of 2026-05-13: 2 findings / 23 attacks across 2 sessions = 8.7%**, within the projection band but on a sample too small to be load-bearing.
 
 ### Verifying smoke (run this against the repo)
 
@@ -419,4 +456,5 @@ If the headline figure in this doc and the smoke output disagree by more than 1 
 | Date | Change |
 |---|---|
 | 2026-05-12 | Initial projection-only analysis. Pricing pinned to `cost.py` 2026-05-11 table. |
-| TBD (Task 59) | Replace projected token counts with measurements from `agent_steps` SQLite rows. |
+| 2026-05-13 | Added "Measured" subsection from session `29488fc5` (5 campaigns, $0.20, no-finding path). Confirmed 3 Judge checks/campaign matching MVP rubric reality. Confirmed Red Team `0¢` accounting gap (NEXT-SESSION.md Known Debt #5). Lifetime finding rate 2/23 ≈ 8.7%. Source dump: `docs/EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json`. |
+| TBD | Replace remaining projected token counts with raw SDK-reported usage; capture cache-hit rates. |

@@ -1,0 +1,70 @@
+{
+  "session_id": "29488fc5-e489-4050-977c-facdfb38e3fc",
+  "total_cost_cents": 20,
+  "by_agent": [
+    {
+      "agent": "judge",
+      "calls": 15,
+      "cost_cents": 15,
+      "avg_latency_ms": 2650.5333333333333
+    },
+    {
+      "agent": "orchestrator",
+      "calls": 5,
+      "cost_cents": 5,
+      "avg_latency_ms": 1301.0
+    },
+    {
+      "agent": "red_team",
+      "calls": 6,
+      "cost_cents": 0,
+      "avg_latency_ms": 5984.166666666667
+    }
+  ],
+  "by_tool": [
+    {
+      "agent": "judge",
+      "tool": "evaluate_check_agent_took_unauthorized_action",
+      "calls": 5,
+      "cost_cents": 5,
+      "avg_latency_ms": 2732.8
+    },
+    {
+      "agent": "judge",
+      "tool": "evaluate_check_citation_to_nonexistent_source",
+      "calls": 5,
+      "cost_cents": 5,
+      "avg_latency_ms": 2553.4
+    },
+    {
+      "agent": "judge",
+      "tool": "evaluate_check_system_prompt_revealed",
+      "calls": 5,
+      "cost_cents": 5,
+      "avg_latency_ms": 2665.4
+    },
+    {
+      "agent": "orchestrator",
+      "tool": "campaign_rationale",
+      "calls": 5,
+      "cost_cents": 5,
+      "avg_latency_ms": 1301.0
+    },
+    {
+      "agent": "red_team",
+      "tool": "call_target",
+      "calls": 5,
+      "cost_cents": 0,
+      "avg_latency_ms": 6483.2
+    },
+    {
+      "agent": "red_team",
+      "tool": "generate_mutation",
+      "calls": 1,
+      "cost_cents": 0,
+      "avg_latency_ms": 3489.0
+    }
+  ],
+  "campaigns_run": 5,
+  "cost_per_campaign_cents_avg": 4.0
+}

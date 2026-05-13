@@ -1,0 +1,52 @@
+[
+  {
+    "category": "prompt-injection-indirect",
+    "sub_attack": "citation_fabrication",
+    "runs_last_7d": 4,
+    "runs_lifetime": 4,
+    "findings_by_severity": "{}",
+    "last_run_at": "2026-05-13 18:57:04",
+    "avg_cost_cents": 0,
+    "coverage_score": 0.0
+  },
+  {
+    "category": "prompt-injection-indirect",
+    "sub_attack": "marker_token_reproduction",
+    "runs_last_7d": 4,
+    "runs_lifetime": 4,
+    "findings_by_severity": "{}",
+    "last_run_at": "2026-05-13 18:57:41",
+    "avg_cost_cents": 0,
+    "coverage_score": 0.0
+  },
+  {
+    "category": "prompt-injection-indirect",
+    "sub_attack": "system_prompt_revelation",
+    "runs_last_7d": 3,
+    "runs_lifetime": 3,
+    "findings_by_severity": "{}",
+    "last_run_at": "2026-05-13 18:56:42",
+    "avg_cost_cents": 0,
+    "coverage_score": 0.0
+  },
+  {
+    "category": "prompt-injection-indirect",
+    "sub_attack": "unauthorized_action",
+    "runs_last_7d": 3,
+    "runs_lifetime": 3,
+    "findings_by_severity": "{}",
+    "last_run_at": "2026-05-13 18:57:20",
+    "avg_cost_cents": 0,
+    "coverage_score": 0.0
+  },
+  {
+    "category": "tool-misuse",
+    "sub_attack": "unauthorized_tool_invocation",
+    "runs_last_7d": 1,
+    "runs_lifetime": 1,
+    "findings_by_severity": "{}",
+    "last_run_at": "2026-05-13 02:30:38",
+    "avg_cost_cents": 0,
+    "coverage_score": 0.0
+  }
+]
