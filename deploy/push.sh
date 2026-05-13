@@ -168,14 +168,37 @@ set -euo pipefail
 # Re-chown anything rsync just landed as root.
 chown -R agentforge-redteam:agentforge-redteam /srv/agentforge-redteam
 
-# Apply nginx config if it changed (idempotent).
-if ! cmp -s /srv/agentforge-redteam/deploy/nginx-http-only.conf /etc/nginx/sites-available/agentforge-redteam; then
-    install -m 0644 /srv/agentforge-redteam/deploy/nginx-http-only.conf /etc/nginx/sites-available/agentforge-redteam
+# Apply nginx config if it changed (idempotent). Picks the TLS-enabled
+# variant when a Let's Encrypt cert exists for the sslip.io hostname,
+# else falls back to the HTTP-only fallback. The selection lives here so
+# the laptop side stays single-source-of-truth for which conf is live.
+NGINX_SRC=/srv/agentforge-redteam/deploy/nginx-http-only.conf
+if [ -f /etc/letsencrypt/live/104-248-232-22.sslip.io/fullchain.pem ]; then
+    NGINX_SRC=/srv/agentforge-redteam/deploy/nginx-tls.conf
+fi
+echo "nginx: using $(basename "$NGINX_SRC")"
+if ! cmp -s "$NGINX_SRC" /etc/nginx/sites-available/agentforge-redteam; then
+    install -m 0644 "$NGINX_SRC" /etc/nginx/sites-available/agentforge-redteam
     nginx -t 2>&1 | tail -2
     systemctl reload nginx
     echo "nginx: reloaded (config drift detected)"
 else
     echo "nginx: config unchanged, no reload"
+fi
+
+# Cert-renewal deploy hook: certbot.timer renews every ~12h; nginx must
+# pick up the new fullchain.pem without manual intervention. Idempotent
+# write — only updates the file if content differs.
+HOOK=/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh
+HOOK_BODY='#!/bin/sh
+# Installed by deploy/push.sh — reload nginx after Lets Encrypt renewal.
+systemctl reload nginx
+'
+mkdir -p "$(dirname "$HOOK")"
+if ! [ -f "$HOOK" ] || [ "$(cat "$HOOK")" != "$HOOK_BODY" ]; then
+    printf '%s' "$HOOK_BODY" > "$HOOK"
+    chmod 0755 "$HOOK"
+    echo "certbot: deploy hook installed"
 fi
 
 # Apply systemd unit drift (idempotent).
@@ -222,10 +245,21 @@ fi
 # 4. Public smoke
 # ---------------------------------------------------------------------------
 step "public smoke"
+
+# Pick scheme + hostname based on whether the TLS cert is on the droplet.
+# sslip.io hostname is required for cert SAN matching; bare IP would fail
+# verification even though the cert is valid.
+if ssh -o BatchMode=yes "$SSH_TARGET" 'test -f /etc/letsencrypt/live/104-248-232-22.sslip.io/fullchain.pem' 2>/dev/null; then
+    SMOKE_URL="https://104-248-232-22.sslip.io"
+else
+    SMOKE_URL="http://$DROPLET_HOST"
+fi
+hint "smoke base: $SMOKE_URL"
+
 HEALTH=$(uv run python -c "
 import urllib.request as r, urllib.error
 try:
-    with r.urlopen('http://$DROPLET_HOST/healthz', timeout=10) as resp:
+    with r.urlopen('$SMOKE_URL/healthz', timeout=10) as resp:
         print(resp.status)
 except urllib.error.HTTPError as e:
     print(e.code)
@@ -234,15 +268,15 @@ except Exception as e:
 " 2>/dev/null)
 
 case "$HEALTH" in
-    200) ok "GET http://$DROPLET_HOST/healthz -> 200" ;;
-    ERR:*) fail "GET http://$DROPLET_HOST/healthz -> $HEALTH" ;;
-    *)   fail "GET http://$DROPLET_HOST/healthz -> HTTP $HEALTH" ;;
+    200) ok "GET $SMOKE_URL/healthz -> 200" ;;
+    ERR:*) fail "GET $SMOKE_URL/healthz -> $HEALTH" ;;
+    *)   fail "GET $SMOKE_URL/healthz -> HTTP $HEALTH" ;;
 esac
 
 UI=$(uv run python -c "
 import urllib.request as r, urllib.error
 try:
-    with r.urlopen('http://$DROPLET_HOST/ui', timeout=10) as resp:
+    with r.urlopen('$SMOKE_URL/ui', timeout=10) as resp:
         print(resp.status)
 except urllib.error.HTTPError as e:
     print(e.code)
@@ -251,12 +285,12 @@ except Exception as e:
 " 2>/dev/null)
 
 case "$UI" in
-    401) ok "GET http://$DROPLET_HOST/ui -> 401 (auth gate works)" ;;
-    *)   warn "GET http://$DROPLET_HOST/ui -> $UI (expected 401)" ;;
+    401) ok "GET $SMOKE_URL/ui -> 401 (auth gate works)" ;;
+    *)   warn "GET $SMOKE_URL/ui -> $UI (expected 401)" ;;
 esac
 
 # ---------------------------------------------------------------------------
 echo
 printf "${GREEN}${BOLD}Deploy complete.${NC}\n"
-echo "  UI:      http://$DROPLET_HOST/ui"
+echo "  UI:      $SMOKE_URL/ui"
 echo "  Logs:    ssh $SSH_TARGET 'journalctl -u agentforge-redteam-web.service -f'"
