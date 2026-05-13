@@ -1,0 +1,39 @@
+{
+  "session_id": "ebd35d75-66d4-4dbf-a186-ade0ff90d6de",
+  "total_cost_cents": 48,
+  "campaigns_run": 6,
+  "cost_per_campaign_cents_avg": 8.0,
+  "by_agent": [
+    {
+      "agent": "documentation",
+      "calls": 4,
+      "cost_cents": 2,
+      "avg_latency_ms": 3813.0
+    },
+    {
+      "agent": "judge",
+      "calls": 30,
+      "cost_cents": 30,
+      "avg_latency_ms": 2826.0
+    },
+    {
+      "agent": "orchestrator",
+      "calls": 10,
+      "cost_cents": 10,
+      "avg_latency_ms": 1405.0
+    },
+    {
+      "agent": "red_team",
+      "calls": 16,
+      "cost_cents": 6,
+      "avg_latency_ms": 5326.0
+    }
+  ],
+  "deltas_vs_e2590f4c": {
+    "documentation": "5\u00a2 \u2192 2\u00a2 (-60%) \u2014 Sonnet \u2192 Haiku swap working",
+    "judge": "32\u00a2 \u2192 30\u00a2 (-6%) \u2014 within rounding noise; cache deployed but not engaging",
+    "orchestrator": "11\u00a2 \u2192 10\u00a2 (-9%) \u2014 within rounding noise",
+    "red_team": "0\u00a2 \u2192 6\u00a2 (+6\u00a2) \u2014 accounting was broken, now correct (real cost surfaced)"
+  },
+  "findings_landed": 2
+}

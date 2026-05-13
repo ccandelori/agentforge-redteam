@@ -1,0 +1,24 @@
+{
+  "session_id": "ebd35d75-66d4-4dbf-a186-ade0ff90d6de",
+  "started_at": "2026-05-13 21:12:17",
+  "ended_at": "2026-05-13 21:15:42.913908+00:00",
+  "halt_reason": "no_progress",
+  "cost_cap_cents_requested": 75,
+  "total_cost_cents_actual": 48,
+  "total_cost_usd_actual": 0.48,
+  "agent_steps_total": 60,
+  "campaigns_run": 6,
+  "deployed_platform_url": "https://104-248-232-22.sslip.io/ui/",
+  "platform_commit_at_run": "59f93cb (post-cost-reduction batch: prompt caching + doc-haiku + red-team accounting)",
+  "verifies_fixes": [
+    "59f93cb Doc Agent Sonnet\u2192Haiku \u2014 VERIFIED: 5\u00a2\u21922\u00a2 (60% reduction), latency 9.8s\u21923.8s (2.5x faster)",
+    "59f93cb Red Team accounting \u2014 VERIFIED: 0\u00a2 (hidden) \u2192 6\u00a2 (visible). Previously-unaccounted ~12% of session cost now correctly attributed.",
+    "59f93cb Anthropic prompt caching \u2014 DEPLOYED BUT INACTIVE: judge.md is 799 tokens, below Anthropic Sonnet 4.6's 1024-token cache minimum. cache_control block is sent but silently ignored by the API. Per-call Judge cost stayed at ~1\u00a2/call (rounding-equal to pre-fix)."
+  ],
+  "db_snapshot": {
+    "filename": "platform_droplet_20260513T212657Z.db",
+    "sha256": "e1a75c0f4155e44cc1a585cf6466a56da2fae40c8cbd1ae0706ad8374c52007c",
+    "size_bytes": 2220032
+  },
+  "git_sha_at_capture": "59f93cb81084b86ad3b5668efe226de237a74729"
+}

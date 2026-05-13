@@ -10,6 +10,7 @@ provenance (DB SHA-256, git SHA at capture, deployed/target URLs).
 
 | Session | Date | Cost | Outcome | Path |
 |---|---|---|---|---|
+| `ebd35d75-66d4-4dbf-a186-ade0ff90d6de` | 2026-05-13 | $0.48 | Clean halt (`no_progress`) in 3 min. Cost-reduction verification: Doc Agent → Haiku worked (60% cut on doc), Red Team accounting fix worked (was hiding 6¢), prompt caching deployed but inactive (judge.md too short for the 1024-tok minimum). | [`2026-05-13-session-ebd35d75/`](./2026-05-13-session-ebd35d75/) |
 | `e2590f4c-b1e6-4432-bc8e-981fa97c6edd` | 2026-05-13 | $0.48 | Clean halt (`no_progress`) in 4 min. 6 campaigns, 2 new findings (clean payloads). Verifies all three fixes from the prior session land correctly in production. | [`2026-05-13-session-e2590f4c/`](./2026-05-13-session-e2590f4c/) |
 | `29488fc5-e489-4050-977c-facdfb38e3fc` | 2026-05-13 | $0.20 | Wedged at campaign 5; 0 new findings; cost data captured for 26 agent steps. Surfaced the Red Team mutation JSON envelope bug — see session README. | [`2026-05-13-session-29488fc5/`](./2026-05-13-session-29488fc5/) |
 

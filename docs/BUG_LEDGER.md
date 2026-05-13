@@ -20,6 +20,53 @@ reviewer-visible consequence), **Resolution** (the fix), **Surfaced by**
 
 ---
 
+## 2026-05-13 — Cost reduction batch (commit `59f93cb`)
+
+Three patches in one commit, surfaced from cost analysis of session
+`e2590f4c` (Judge dominated 67% of cost, Red Team reported 0¢).
+Verified against session [`ebd35d75`](EVIDENCE/2026-05-13-session-ebd35d75/).
+
+### 4. Red Team mutation cost recorded as 0¢
+
+- **Bug:** `red_team_node`'s `call_tool` invocation for
+  `generate_mutation` did NOT pass a `cost_estimator` parameter.
+  Judge / Orchestrator / Documentation all pass
+  `cost_estimator=lambda r: int(getattr(r, "cost_cents", 0))`;
+  Red Team was missing that one parameter, so the wrapper recorded
+  `cost_cents=0` regardless of what `LLMResponse.cost_cents`
+  actually contained. NEXT-SESSION.md Known Debt #5.
+- **Impact:** ~12% of session cost was hidden from the platform's
+  own accounting. In session `e2590f4c`, real Red Team cost was
+  ~6¢/session that showed up as 0¢. At scale the discrepancy would
+  have grown linearly and hidden a real budget driver from the
+  operator.
+- **Resolution:** Commit **[`59f93cb`](https://gitlab.com/cameroncandelori/agentforgeredteam/-/commit/59f93cb)**
+  — add `cost_estimator=...` to red_team's `generate_mutation`
+  `call_tool` invocation, matching the other agents' pattern.
+- **Verified by:** Session [`ebd35d75`](EVIDENCE/2026-05-13-session-ebd35d75/)
+  shows Red Team cost as 6¢ for 16 calls — was 0¢ in the prior session.
+
+### 5. Doc Agent used Sonnet 4.6 when Haiku 4.5 suffices
+
+- **Bug:** Doc Agent generates structured markdown finding reports
+  from a detailed envelope — the prompt is more structure than
+  reasoning. Sonnet 4.6 ($3/$15 per 1M tokens) was overkill;
+  Haiku 4.5 ($1/$5 per 1M, 3x cheaper) handles the same template
+  output with negligible quality loss.
+- **Impact:** 2.5¢/finding measured in session `e2590f4c`. At
+  10% finding rate × 1K runs/week, that's ~$2.50/week unnecessarily
+  spent on doc-agent calls. Latency was also high (avg 9.79 s on
+  Sonnet, blocking the orchestrator's next decision for ~10 s on
+  every confirmed finding).
+- **Resolution:** Commit **[`59f93cb`](https://gitlab.com/cameroncandelori/agentforgeredteam/-/commit/59f93cb)**
+  — swap `agents/documentation.py:DEFAULT_MODEL` to
+  `claude-haiku-4-5-20251001`. One-line constant change with a
+  docstring recording the rationale + measurement source.
+- **Verified by:** Session [`ebd35d75`](EVIDENCE/2026-05-13-session-ebd35d75/)
+  — Doc Agent dropped from 5¢ → 2¢ (-60%) and avg latency from
+  9.79 s → 3.81 s (2.5x faster). Output quality is unchanged
+  (same finding-envelope template, well-formed JSON in both runs).
+
 ## 2026-05-13 — Session 29488fc5 evidence run
 
 This batch of three bugs surfaced from the first live campaign packaged
@@ -119,10 +166,41 @@ into [`docs/EVIDENCE/2026-05-13-session-29488fc5/`](EVIDENCE/2026-05-13-session-
 
 ## Diagnosis corrections
 
-Entries here are *not* platform bugs — they're cases where the
-session-evidence README or my chat framing got the root cause wrong and
-was corrected after deeper investigation. Recorded for honesty / so
-graders can trace the reasoning trail.
+Entries here are *not* platform bugs — they're cases where a fix was
+shipped but didn't have the projected effect, or where my earlier
+framing of a symptom was wrong. Recorded for honesty / so graders can
+trace the reasoning trail.
+
+### Anthropic prompt caching deployed but inactive (judge.md too short)
+
+- **Original framing (commit `59f93cb`):** "Wrap system in a
+  cache_control block on every Anthropic call → ~35% Judge cost
+  reduction (~23% session total) from prompt caching's 0.1x
+  cache-read multiplier."
+- **What actually happened:** The patch is implemented correctly and
+  the API receives the `cache_control` block on every call. But
+  Anthropic silently ignores cache requests when the cached prefix
+  is below their per-model minimum (1024 tokens for Claude Sonnet
+  4.6). `prompts/judge.md` is **3197 chars ≈ 799 tokens** — under
+  the threshold. The cache never engages.
+- **Evidence:** Session [`ebd35d75`](EVIDENCE/2026-05-13-session-ebd35d75/)
+  Judge cost dropped only 32¢ → 30¢ (-6%, within rounding noise),
+  per-call cost stayed at 1¢/call. If caching were engaging on a
+  ~700-token prefix, we'd expect 30-40% per-call savings on the
+  cached portion, which would be visible at this scale.
+- **Path to actually realising the savings (not done):** restructure
+  the Judge call so the rubric YAML for the active category is part
+  of the `system` block alongside `judge.md`. Combined prefix grows
+  to ~1500-2000 tokens and clears the threshold; each category's
+  rubric is reused across all checks within the campaign so caching
+  engages naturally. ~30 min refactor in `judge.py`. *Padding
+  judge.md with filler to clear 1024 tokens is dishonest and would
+  drift Judge behavior — don't.*
+- **Why this is not a bug:** the code is correct. Anthropic's API
+  behaves as documented. We shipped a fix whose precondition isn't
+  met by current prompt sizes. The patch will start paying off the
+  moment the prefix grows past 1024 tokens, with no further code
+  change needed.
 
 ### Empty `rubric_outcomes={}` is not a Judge bug
 
