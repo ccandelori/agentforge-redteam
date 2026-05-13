@@ -39,6 +39,7 @@ Design choices worth calling out:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from collections.abc import Iterator
@@ -46,8 +47,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any
-
-import logging
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,6 +59,8 @@ from agentforge_redteam.db import create_platform_engine
 from agentforge_redteam.kill_switch import is_kill_switch_enabled, set_kill_switch
 from agentforge_redteam.web.auth import require_operator
 from agentforge_redteam.web.schemas import (
+    ActiveSessionActivity,
+    ActiveSessionsResponse,
     ApproveRequest,
     ApproveResponse,
     CoverageResponse,
@@ -73,8 +74,6 @@ from agentforge_redteam.web.schemas import (
     RejectRequest,
     SessionStatusResponse,
     StartSessionRequest,
-    ActiveSessionActivity,
-    ActiveSessionsResponse,
     StartSessionResponse,
 )
 

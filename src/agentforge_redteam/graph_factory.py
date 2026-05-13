@@ -269,7 +269,7 @@ class HTTPTargetClient:
     strict verification can pass ``verify_tls=True``.
     """
 
-    __slots__ = ("_timeout_s", "_verify_tls", "_jwt_secret", "_patient_id", "_user_id", "_username", "_role")
+    __slots__ = ("_jwt_secret", "_patient_id", "_role", "_timeout_s", "_user_id", "_username", "_verify_tls")
 
     def __init__(
         self,
