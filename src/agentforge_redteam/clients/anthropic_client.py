@@ -216,9 +216,7 @@ class AnthropicClient:
                 cache_creation_input_tokens=int(
                     getattr(usage, "cache_creation_input_tokens", 0) or 0
                 ),
-                cache_read_input_tokens=int(
-                    getattr(usage, "cache_read_input_tokens", 0) or 0
-                ),
+                cache_read_input_tokens=int(getattr(usage, "cache_read_input_tokens", 0) or 0),
                 output_tokens=int(getattr(usage, "output_tokens", 0) or 0),
                 cost_cents=cost_cents,
             )

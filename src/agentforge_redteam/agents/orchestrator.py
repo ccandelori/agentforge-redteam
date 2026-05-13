@@ -508,11 +508,7 @@ async def orchestrator_node(
     #     See BUG_LEDGER.md ("Cost cap leakage") and live overshoot
     #     observed in session f044fd18 ($0.75 cap → $1.16 actual).
     cost_so_far_cents = int(state.cost_so_far * Decimal(100))
-    projected = (
-        cost_so_far_cents
-        + policy.default_campaign_budget_cents
-        + _DOC_AGENT_RESERVE_CENTS
-    )
+    projected = cost_so_far_cents + policy.default_campaign_budget_cents + _DOC_AGENT_RESERVE_CENTS
     if projected > policy.max_session_cost_cents:
         return _halt(state, HALT_BUDGET)
 
