@@ -587,40 +587,56 @@ def regress(
     Exit code is ``1`` if any case regressed (so a CI gate fails the build),
     ``0`` otherwise. The summary tally is printed regardless.
 
-    Scaffolding note
-    ----------------
-    The HTTP and LLM clients wired here are deliberately **no-op fakes** -
-    the CLI confirms the on-disk regression corpus parses, exercises the
-    runner -> harness -> ``regression_runs`` insert path, and prints a
-    summary. A follow-up wiring task swaps these for real OpenAI /
-    Anthropic / httpx clients. Until then this command is useful for:
+    Wiring
+    ------
+    Uses **real clients when env is configured**:
 
-    * smoke-testing that promoted cases are still valid JSON,
-    * exercising the audit-row insert path in CI,
-    * confirming the summary aggregation matches the case corpus.
+    * ``HTTPTargetClient`` against the target URL (mints an AgentForge
+      JWT when ``AGENTFORGE_JWT_SECRET`` is set, plain ``{"payload": ...}``
+      POSTs otherwise).
+    * Anthropic Judge client built by ``create_anthropic_client``
+      (requires ``ANTHROPIC_API_KEY``).
+
+    When ``ANTHROPIC_API_KEY`` is **not** set, the command falls back to
+    ``_NoopHTTP`` / ``_NoopLLM`` stubs. That fallback preserves the CI
+    smoke use case: a no-key environment can still exercise the
+    on-disk corpus parser and the ``regression_runs`` insert path without
+    spending API budget.
+
+    Operator workflow note
+    ----------------------
+    This is a **manual replay tool**, useful for one-off "did case X
+    regress on the new target SHA?" debugging. The canonical
+    orchestrator-driven path is ``start-session``: when the orchestrator
+    halts on ``regression_due``, ``graph_factory._regression_closure``
+    runs the same ``run_regression_session`` automatically with the same
+    real clients.
     """
     # Local imports keep the CLI's cold-start budget tight - we only pay for
-    # asyncio / the runner when the operator actually runs ``regress``.
+    # asyncio / the runner / heavy graph_factory imports when the operator
+    # actually runs ``regress``.
     import asyncio
     import json as _json
     import os
 
     from agentforge_redteam.agents.judge import LLMResponse as JudgeLLMResponse
     from agentforge_redteam.agents.red_team import TargetResponse
+    from agentforge_redteam.graph_factory import HTTPTargetClient
     from agentforge_redteam.regression.runner import run_regression_session
 
     resolved_target_url = target_url or os.environ.get(
         "TARGET_DROPLET_URL", "http://localhost:8000"
     )
+    env = os.environ.copy()
 
     class _NoopHTTP:
-        """No-op HTTP target client. See command docstring for rationale."""
+        """No-op HTTP fallback when env is not configured (CI smoke path)."""
 
         async def post(self, *, url: str, payload: str, timeout_s: float) -> TargetResponse:
             return TargetResponse(status_code=200, body="(noop)", target_sha=target_sha)
 
     class _NoopLLM:
-        """No-op LLM client returning a Judge-shaped ``no-hit`` JSON envelope."""
+        """No-op Judge fallback when ANTHROPIC_API_KEY is not set."""
 
         async def complete(self, *, system: str, user: str, model: str) -> JudgeLLMResponse:
             return JudgeLLMResponse(
@@ -628,14 +644,29 @@ def regress(
                 cost_cents=0,
             )
 
+    from agentforge_redteam.agents.red_team import HTTPTargetClientLike
+
+    real_judge = create_anthropic_client(env)
+    http_client: HTTPTargetClientLike
+    judge_client: object
+    if real_judge is not None:
+        jwt_secret = env.get("AGENTFORGE_JWT_SECRET", "").strip() or None
+        http_client = HTTPTargetClient(jwt_secret=jwt_secret)
+        judge_client = real_judge
+        client_mode = "REAL (HTTPTargetClient + Anthropic)"
+    else:
+        http_client = _NoopHTTP()
+        judge_client = _NoopLLM()
+        client_mode = "NOOP (set ANTHROPIC_API_KEY for real replay)"
+
     engine = create_platform_engine()
     try:
         summary = asyncio.run(
             run_regression_session(
                 new_target_sha=target_sha,
                 engine=engine,
-                http=_NoopHTTP(),
-                llm_for_judge=_NoopLLM(),
+                http=http_client,
+                llm_for_judge=judge_client,
                 root=root,
             )
         )
@@ -643,6 +674,7 @@ def regress(
         engine.dispose()
 
     typer.echo(f"Regression session against target_sha={target_sha}")
+    typer.echo(f"  clients: {client_mode}")
     typer.echo(f"  target_url: {resolved_target_url}")
     typer.echo(f"  total: {summary.total}")
     typer.echo(f"  held: {summary.held}")
