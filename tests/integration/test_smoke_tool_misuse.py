@@ -320,9 +320,7 @@ def test_seed_payloads_present_for_all_tool_misuse_sub_attacks() -> None:
         "recursive_loop",
         "audit_log_evasion",
     }
-    assert expected.issubset(sub_attacks), (
-        f"missing seeds for: {expected - sub_attacks}"
-    )
+    assert expected.issubset(sub_attacks), f"missing seeds for: {expected - sub_attacks}"
 
 
 async def test_smoke_runtime_is_fast(

@@ -46,7 +46,9 @@ def test_each_category_has_exactly_five_entries() -> None:
     library = load_attack_library()
     counts = Counter(seed.category for seed in library.attacks)
     for category in EXPECTED_CATEGORIES:
-        assert counts[category] >= 5, f"{category} has {counts[category]} seeds, expected at least 5"
+        assert counts[category] >= 5, (
+            f"{category} has {counts[category]} seeds, expected at least 5"
+        )
 
 
 def test_payloads_within_each_category_sub_attack_are_unique() -> None:

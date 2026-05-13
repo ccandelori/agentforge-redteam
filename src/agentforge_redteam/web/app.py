@@ -411,8 +411,7 @@ def get_active_sessions(
                     findings_n = 0
                 cost_cents = conn.execute(
                     text(
-                        "SELECT COALESCE(SUM(cost_cents), 0) FROM agent_steps "
-                        "WHERE session_id = :s"
+                        "SELECT COALESCE(SUM(cost_cents), 0) FROM agent_steps WHERE session_id = :s"
                     ),
                     {"s": sid},
                 ).scalar_one()
