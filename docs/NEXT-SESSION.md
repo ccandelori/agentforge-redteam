@@ -1,147 +1,209 @@
 # NEXT-SESSION.md — agentforge-redteam
 
-**Last updated**: 2026-05-11 (Mon evening). Authored by Claude Code in the planning session before implementation begins.
+**Last updated**: 2026-05-12 (late-night demo-prep session).
 
-This file is the first thing to read at the start of any new session on `agentforge-redteam`. It is the resume substrate — what's committed, what's next, what hurts.
+This file is the first thing to read at the start of any new session.
+It supersedes the prior planning-era version. What's shipped, what's
+broken, what to pick up next.
 
 ---
 
-## Where we are
+## Status
 
-Planning phase **complete**. Implementation phase **not started**.
+MVP shipped. The Week 3 demo recording is happening against a live
+Co-Pilot at `https://104-248-232-22.sslip.io/ui` with HTTPS, real
+agents, real findings persisting live to the UI. All code on `main`.
 
-Four commits on `main`:
+## Live URLs
 
-```
-94a86fc chore(taskmaster): initialize tasks from PRD via parse-prd --research
-834400f docs(planning): add Taskmaster PRD for Week 3 build
-05c78c0 docs(planning): add diagrams and defense substrate for architecture defense
-a093940 docs(planning): initial presearch, threat model, users, and architecture
-```
+| What | URL |
+|---|---|
+| Operator UI | `https://104-248-232-22.sslip.io/ui` |
+| Healthz | `https://104-248-232-22.sslip.io/healthz` |
+| Langfuse traces | `https://us.cloud.langfuse.com` (project `pk-lf-a5…`) |
+| GitLab repo | `https://labs.gauntletai.com/cameroncandelori/agentforgeredteam` |
 
-Eight documents in the repo, all committed:
+BasicAuth credentials live in `/etc/agentforge-redteam/redteam.env` on
+the droplet (`WEB_UI_USER` / `WEB_UI_PASSWORD`). API keys (Anthropic,
+OpenAI, Langfuse, AgentForge JWT secret) also there.
 
-- `presearch.md` (225 lines) — 16-point pre-search outcomes, open questions, identified risks, next-steps backlog
-- `THREAT_MODEL.md` (445 lines) — attack surface mapped to OWASP LLM 2025 / OWASP Web 2025 / MITRE ATLAS v5.4.0 / NIST AI 600-1 / HIPAA §164
-- `USERS.md` (258 lines) — four operator personas + the "why multi-agent" architecture justification
-- `ARCHITECTURE.md` (837 lines) — four-agent design with tradeoffs and cost analysis
-- `DIAGRAMS.md` (741 lines) — 12 Mermaid diagrams + ASCII fallbacks
-- `DEFENSE.md` (295 lines) — anticipated Q&A, counter-arguments, honest limitations
-- `.taskmaster/docs/agentforge-redteam-prd.md` (324 lines) — Taskmaster-shaped PRD distilling the above
-- `.taskmaster/tasks/tasks.json` — 50 parent tasks + 231 subtasks (281 actionable units) with all 339 dependencies validated
-
-## Read these first (in this order)
-
-1. **This file** — you're already here.
-2. `presearch.md` — fastest way to load context (open questions + decisions).
-3. `ARCHITECTURE.md` § Executive Summary — 500-word framing of the four-agent design.
-4. `task-master next` — Taskmaster tells you what to work on.
-5. `task-master show <id>` — full task detail when you pick one up.
-
-Skip on first read: DIAGRAMS.md (consult when needed), DEFENSE.md (consult before the architecture defense), the PRD (consult before adding tasks).
-
-## Immediate next action
-
-Open the repo. Run:
+## Common commands
 
 ```bash
-cd ~/Desktop/Gauntlet/agentforge-redteam
-task-master next
+# Deploy current main to droplet (laptop side)
+./deploy/push.sh
+
+# Backend-only changes (skip the SPA rebuild)
+./deploy/push.sh --skip-build
+
+# Wipe all session data on droplet (kill_switch row preserved)
+ssh root@104.248.232.22 'sudo -u agentforge-redteam sqlite3 /srv/agentforge-redteam/var/platform.db <<SQL
+DELETE FROM human_approval_queue; DELETE FROM findings;
+DELETE FROM regression_runs; DELETE FROM verdicts;
+DELETE FROM attacks; DELETE FROM coverage_matrix;
+DELETE FROM agent_steps; DELETE FROM run_manifests;
+SQL
+systemctl restart agentforge-redteam-web.service'
+
+# Trigger a session via the JSON API (same shape the SPA POSTs)
+set -a && source .env && set +a
+curl -u "$WEB_UI_USER:$WEB_UI_PASSWORD" \
+    -X POST https://104-248-232-22.sslip.io/sessions/start \
+    -H "Content-Type: application/json" \
+    -d '{"cost_cap_cents": 25, "target": "droplet_prod", "categories": ["prompt-injection-indirect"]}'
+
+# Watch live counters
+curl -u "$WEB_UI_USER:$WEB_UI_PASSWORD" \
+    https://104-248-232-22.sslip.io/sessions/active | python3 -m json.tool
+
+# Tail droplet logs
+ssh root@104.248.232.22 'journalctl -u agentforge-redteam-web.service -f'
+
+# Run a session locally (writes to ./var/platform.db, not droplet)
+set -a && source .env && set +a
+uv run agentforge-redteam start-session \
+    --target droplet_prod --cost-cap-cents 25 \
+    --categories prompt-injection-indirect --max-campaigns 5
+
+# CI: laptop-side runner picks up any push automatically
+git push origin <branch>
 ```
 
-Expected output: **Task #1 — Initialize Python project with uv and pyproject.toml** (complexity 3, no dependencies, 11 downstream blockers).
+## What shipped today (most recent first)
 
-Then create the branch and start TDD:
-
-```bash
-git checkout -b task-1-init-python-project
+```
+d5d6347 fix(deploy): drop HTTP/2 from TLS listener — middlebox compat
+f69e586 feat(deploy): TLS via Let's Encrypt against sslip.io hostname
+337c5c3 chore(format): ruff format pass
+6f82807 chore(lint): ruff auto-fix import + __slots__ ordering
+23858eb fix(env): clarify LANGFUSE_HOST regional choice in .env.example
+d351aee feat(spa): live polling, session status badge, live-activity card
+902fcb7 feat(web): BackgroundTasks dispatch + /sessions/active live counters
+579f648 feat(coverage): audit_log_evasion seed + canary suppression + recursion bump
+4d27962 fix(documentation): strip markdown JSON fences from doc agent LLM output
+d4d96f9 fix(judge): accept overall-verdict JSON, strip markdown fences, persist verdicts
+4f3954d feat(agents): eager attacks/verdicts/coverage_matrix persistence
+2075745 feat(target): integrate AgentForge Clinical Co-Pilot LLM endpoint
+06b9356 chore(models): rename claude-sonnet-4-20250514 → claude-sonnet-4-6
+1456984 fix(langfuse): migrate to v4 SDK
+5651e98 chore(deps): add pyjwt for AgentForge sidecar JWT minting
+781671e chore(gitignore): exclude Claude Code session state
 ```
 
-Per CLAUDE.md and memory: branch-per-task. Per-task commits use `Assisted-by: Claude Code` trailer if Claude wrote them. TDD with pytest is the default for deterministic surfaces; eval-driven for LLM loops.
+13 commits via MR !2 + a few direct-to-main ops fixes after.
 
-## Critical-path chain (don't break this order)
+## Known debt — prioritized
 
-Per `THREAT_MODEL.md` and the PRD's Logical Dependency Chain section. Taskmaster's dependency graph enforces this, but as a sanity check:
+### High
 
-1. **Task 1 (Init project)** → unlocks 11 children
-2. **Tasks 11 + 12 (Pydantic schemas + SQLite migrations)** → unlock the audit wrapper
-3. **Task 13 (Audited tool wrapper)** → required before any agent calls the target
-4. **Tasks 14, 15 (Kill switch + targets.yaml allowlist)** → required before any live target call
-5. **Task 18 (Rubric YAML schema) + Tasks 19/20/21 (3 MVP rubrics)** → required before Judge can grade
-6. **Task 23 (30 ground-truth cases)** → required before Judge is promoted to live (timebox to 4h Monday afternoon if not done; PRD risk #6)
-7. **Tasks 24–28 (LangGraph skeleton + 4 agent skeletons)** → unlock Phase 5 MVP gate
-8. **MVP gate Phase 5 (Tasks 31–36)** → submission Tuesday 23:59
-9. **Phases 6–9** → Final gate Friday noon
+1. **Doc Agent persistence ordering** (`agents/documentation.py:455`).
+   GitLab issue creation runs BEFORE the `INSERT INTO findings`. A
+   GitLab 401 / network blip kills the session before the finding is
+   persisted to SQLite. **Fix**: INSERT first, then GitLab call;
+   UPDATE the row's `gitlab_issue_id` after GitLab succeeds.
+   Surfaced today when a stale GITLAB_TOKEN crashed the doc agent and
+   we had to clear the env to fall back to LocalFindingsSink.
 
-## Deadlines
+2. **Canary modulo bug** (`agents/orchestrator.py`, search
+   `canary_every_n_campaigns`). `campaigns_run % N == 0` fires on
+   campaign 0 — first run of every session is a canary. Currently
+   masked by `canary_every_n_campaigns: 9999` in
+   `orchestrator_policy.yaml`. **Fix**: `campaigns_run > 0 and
+   campaigns_run % N == 0`. Then drop N back to a sensible value (10
+   or 20) so drift detection actually runs.
 
-- **MVP gate**: Tuesday 2026-05-12 23:59 — deployed target URL, ≥3 attack categories with results, ≥1 agent live, hard-gate docs submitted
-- **Final gate**: Friday 2026-05-15 12:00 — public web UI, ≥3 polished vulnerability reports, AI Cost Analysis at 100/1K/10K/100K runs, demo video (3–5 min), social post
+3. **Cost cap leakage**. The orchestrator halts when its tally reaches
+   the cap, but the Doc Agent's LLM call (~3¢ per finding) runs AFTER
+   that halt and pushes total spend over. Saw a 30¢-cap session land
+   at 38¢. **Fix**: pre-budget the doc-agent cost when computing
+   `proceed_or_halt`, or just subtract a 5¢ reserve from the
+   effective cap.
 
-## What NOT to redo
+### Medium
 
-Don't re-write any of the eight documents listed above. They're sized, scoped, and committed. If you find a gap, add to the relevant doc with a clear delta — don't rewrite.
+4. **`--categories` flag is captured but unused**
+   (`session_runner.py:233` — `TODO(category-filter)`). The orchestrator
+   enumerates from `rubrics/` directly. Wire it through so an operator
+   can scope a run to one category.
 
-Don't re-run `task-master parse-prd`. The 50 tasks are generated. If you need new tasks, use `task-master add-task` or amend the PRD and use `task-master update`.
+5. **OpenAI mutation cost shows $0**. `red_team.generate_mutation` (88
+   calls in one run) reported 0¢. Either `OpenAIClient` returns
+   `cost_cents=0` for `gpt-4o-2024-08-06`, or the model id missed the
+   `PRICING_TABLE`. Check `clients/openai_client.py` + `cost.py`.
 
-Don't change the `.taskmaster/config.json` provider. It's copied from openemr to use `claude-code` provider (opus main, sonnet research, haiku fallback). This routes Taskmaster's LLM calls through the Claude Code subscription — $0 against the project API budget.
+6. **`/sessions/active` is in-memory per-uvicorn-worker**. Restart wipes
+   the running-session set. Two workers each track their own. For the
+   single-worker MVP it's fine; for prod move to a Redis-backed set
+   or a `run_manifests.in_flight` boolean column.
 
-## Workflow expectations (per CLAUDE.md + memory)
+7. **Worker process** (`web/app.py:_dispatch_session`). BackgroundTasks
+   on the threadpool is fine for single-tenant demo; concurrent demos
+   queue serially and could exhaust the threadpool. The architecture
+   originally scoped a separate `agentforge-redteam-worker.service`
+   that polls `run_manifests` for new rows — never built. Either build
+   it or commit to BackgroundTasks + bump uvicorn `--limit-concurrency`.
 
-- **TDD primary**. Deterministic surfaces (schemas, loaders, severity, sanitizer, allowlist, audit wrapper) → strict TDD with pytest. LLM loops (Red Team mutation, Judge grading, Orchestrator policy) → eval-driven.
-- **Branch per task**. Each Taskmaster task gets its own feature branch off main. One commit per subtask for non-trivial tasks.
-- **Commit trailer**: `Assisted-by: Claude Code` when Claude wrote the commit.
-- **Run task-master CLI, not raw tasks.json**. Edit JSON directly only when CLI can't express the op.
-- **Maintain `docs/DEVIATIONS.md`** when implementation diverges from `ARCHITECTURE.md` or the PRD. Log what changed, why, what we learned. Distinguish *deviation* from *unfinished work*.
+### Low
 
-## Gotchas not in the planning docs
+8. **Restore HTTP/2 on a domain migration**. `deploy/nginx-tls.conf`
+   currently disables h2 because of a middlebox issue with
+   `104-248-232-22.sslip.io` from the operator's network. When we
+   move off this IP / hostname, put `http2` back on the `listen`
+   directives.
 
-1. **`.taskmaster/config.json` was overwritten** after `task-master init` to match the user's openemr config (claude-code provider). This is intentional. If you re-init Taskmaster for any reason, re-copy from `~/Desktop/Gauntlet/openemr/.taskmaster/config.json` before running parse-prd or expand. The init default uses direct Anthropic + Perplexity providers and would charge against API budget.
+9. **Tests for eager persistence path**. New INSERT OR IGNORE in
+   red_team / judge has tests that pass, but no test verifies the
+   "INSERT happens mid-run before session end" property. Add an
+   integration test that asserts SELECT count > 0 mid-LangGraph-run.
 
-2. **`Week 3 - AgentForge - Adversarial AI Security Platform.pdf`** is in the repo root, untracked. It's the original brief. Decide whether to: (a) gitignore it, (b) move to `docs/brief/` and commit, (c) leave untracked as local reference. Default = leave untracked.
+10. **Demo-time canary cadence**. With `canary_every_n_campaigns:
+    9999`, the canary never fires. Once #2 is fixed, drop back to
+    something like 10 — but the Sonnet 4.6 ground-truth cases may
+    need re-authoring (Sonnet calibrates differently than the
+    older Sonnet the cases were written against).
 
-3. **`.gitignore` created by `task-master init` is JavaScript-oriented** (node_modules, etc.). Task 2 in the Taskmaster plan ("Create .gitignore for Python") will expand it for Python (`__pycache__/`, `*.pyc`, `.pytest_cache/`, `var/`, `dist/`, `build/`, `*.egg-info/`, `.coverage`, `htmlcov/`, `.venv/`, `.python-version`).
+## Operator-led TODOs
 
-4. **MITRE ATLAS technique IDs flagged for verification** are listed in `THREAT_MODEL.md` Appendix. AML.T0036, AML.T0048, AML.T0070 are cited from training-era memory; the load-bearing ones (AML.T0051, AML.T0024, AML.T0053) were web-verified. Verify the rest against `atlas.mitre.org` before locking the rubrics in Phase 3.
+- **Task #50** — demo video + social post: video should be in your
+  hands by the time you read this; post wherever.
+- **Task #59** — write up findings from the demo run for the
+  deliverable. Real PASS verdicts are in `var/platform.db` on the
+  droplet (or laptop's `var/platform.db`). Polished markdown reports
+  in `/srv/agentforge-redteam/findings/` on droplet.
+- **Task #62** — TLS ✅ shipped today.
 
-5. **The HIPAA Security Rule 2026 NPRM is finalizing this month** (May 2026). Section numbers cited in THREAT_MODEL.md and ARCHITECTURE.md are from the proposed rule. After finalization, re-map any §164 references to the final rule. The compliance positioning is in `DEFENSE.md` § Compliance.
+## Architecture cheat sheet
 
-6. **GPT-4o refusal rate is unmeasured.** Plan to measure it in the first 24 hours of MVP build. If > 20% on legitimate in-scope categories, swap to OpenRouter (DeepSeek-V3 or Qwen 2.5 72B). Pre-provisioning an OpenRouter key is on the open-questions list in `presearch.md`.
+- **Agents** (`src/agentforge_redteam/agents/`): orchestrator, red_team,
+  judge, documentation. Each is an async fn taking `PlatformState` →
+  `PlatformState` and registered as a LangGraph node by
+  `graph_factory.build_production_graph`.
+- **Eager persistence**: agents `INSERT OR IGNORE` to SQLite mid-run so
+  the UI sees rows live. `agent_steps` populated by the audit wrapper;
+  `attacks` / `verdicts` / `coverage_matrix` / `findings` /
+  `human_approval_queue` by the agents themselves.
+- **Web**: FastAPI at `/`, Vite-built Vue 3 SPA at `/ui/`,
+  BackgroundTasks dispatcher hangs off `POST /sessions/start`.
+  `/sessions/active` polled every 3s by the SPA for the live-activity
+  card.
+- **Target**: `HTTPTargetClient` in `graph_factory.py` mints HS256 JWTs
+  against the AgentForge sidecar's `AGENTFORGE_JWT_SECRET`, POSTs to
+  `https://143.244.157.90:9300/dashboard/turn`, parses SSE.
+- **Deploy**: `./deploy/push.sh` (laptop side) — build + rsync + nginx
+  config + alembic upgrade + service restart + smoke. Picks
+  `nginx-tls.conf` automatically when the Let's Encrypt cert exists,
+  else `nginx-http-only.conf`.
+- **CI**: GitLab pipeline (`lint → type-check → test`) runs on a
+  Docker-executor `gitlab-runner` registered to the laptop. Stays
+  alive while laptop is awake. eval-judge job is tag-only and
+  `allow_failure: true` until `ANTHROPIC_API_KEY` is a CI variable.
 
-7. **Judge ground-truth dataset is the architectural bottleneck.** PRD risk #6 + DEFENSE.md identifies this as the hardest scheduled chunk. Timebox the first 30 cases to 4 hours Monday afternoon. Use the case-authoring CLI built in Task 22 to streamline.
+## Quick wins for the next 30 minutes (if that's all the time we have)
 
-8. **Mock target stub** is the demo-day insurance policy. If the AgentForge droplet has issues Friday, the demo falls back to a FastAPI stub that simulates `/api/agent/turn`, `/api/agent/upload`, etc. with deterministic-vulnerable responses. Not in the Taskmaster task list explicitly — consider adding as Phase 9 Task 50.5 if not already covered.
+1. Fix #1 (Doc Agent ordering) — small refactor in `documentation.py`,
+   adds resilience.
+2. Fix #2 (canary modulo) — one-liner + drop policy back to `N=10`.
+3. Fix #5 (OpenAI cost tracking) — likely a model-id mismatch in the
+   `PRICING_TABLE`. 5-min diagnose, 1-line fix.
 
-## Open questions (still unresolved)
-
-From `presearch.md` and various decisions made during planning:
-
-- Should `Week 3 - ... .pdf` be committed or gitignored?
-- Langfuse instance: reuse the existing AgentForge instance, or stand up a separate one? Separate is cleaner audit story; reuse is faster.
-- Second droplet: own DigitalOcean account, or share with AgentForge target's account? Sharing simplifies billing; separate strengthens blast-radius isolation.
-- Final web UI auth: basic-auth credential, or piggyback on AgentForge's OAuth? Basic-auth is faster.
-- GitLab filing identity: file as the user, or as a dedicated bot account? Bot is cleaner audit.
-- Judge accuracy threshold for MVP: proposed ≥80% precision, ≥90% recall on known-fail; tune after first eval run.
-- OpenRouter pre-provisioning: now, or wait for refusal rate to be an actual blocker?
-- Web UI run cadence in Final deployment: once per night, every 4 hours, or on-demand only?
-
-## Relevant memories (already saved)
-
-- `feedback_tdd_primary.md` — TDD default, pytest for Python
-- `feedback_git_workflow.md` — branch per task, `Assisted-by: Claude Code` trailer
-- `feedback_use_taskmaster_cli.md` — CLI over raw JSON edits
-- `feedback_lean_on_prior_art.md` — map to OWASP/MITRE/NIST/HIPAA framework IDs, don't just name-drop (saved this session)
-- `project_resume_doc.md` — this NEXT-SESSION.md pattern
-- `feedback_no_rm_rf.md` — don't run rm -rf
-- `feedback_max_parallel_agents.md` — fan out subagents when work is file-disjoint
-
-## Cost so far
-
-- **Planning session (this one)**: $0 against API budget. All Taskmaster LLM calls routed through Claude Code subscription via `claude-code` provider (~6.2M tokens consumed).
-- **Implementation budget remaining**: ~$50 MVP + ~$50 Final per `presearch.md`. Anthropic + OpenAI API keys confirmed available.
-
-## One more thing
-
-The architecture defense gate is **~4h after kickoff**. If kickoff has already passed and the defense is imminent, prioritize: open `DEFENSE.md`, walk the demo plan section, have `DIAGRAMS.md` open in a second window. The 60-second and 2-minute elevator pitches are at the top of `DEFENSE.md`.
-
-If the defense is asynchronous (written submission), the four planning docs (`THREAT_MODEL`, `USERS`, `ARCHITECTURE`, `DEFENSE`) plus the agent interaction diagram in `DIAGRAMS.md` collectively form the submission. They are committed and link to each other.
+All three are isolated, well-tested, and add real robustness.
