@@ -1,8 +1,8 @@
 <script setup>
 import { ref } from "vue";
-import { api, apiPost, useResource } from "../composables/api.js";
+import { api, apiPost, usePolledResource } from "../composables/api.js";
 
-const { data, loading, error, refetch } = useResource(() => api("/queue"));
+const { data, loading, error, refetch } = usePolledResource(() => api("/queue"));
 const busy = ref(null);   // queue_id currently mutating
 const flash = ref(null);
 

@@ -1,8 +1,8 @@
 <script setup>
 import { RouterLink } from "vue-router";
-import { api, useResource } from "../composables/api.js";
+import { api, usePolledResource } from "../composables/api.js";
 
-const { data, loading, error } = useResource(() => api("/findings"));
+const { data, loading, error } = usePolledResource(() => api("/findings"));
 </script>
 
 <template>

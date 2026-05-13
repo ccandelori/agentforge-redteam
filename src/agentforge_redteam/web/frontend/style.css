@@ -298,6 +298,81 @@ textarea { min-height: 96px; resize: vertical; font-family: var(--mono); font-si
 .checkbox-row label:hover { background: var(--yellow); }
 .checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 
+/* ------------------------------------------------------ status badge (h3 inline) */
+
+.status-badge {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 2px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    border: 2px solid var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+.status-badge.running { background: var(--accent); color: var(--paper); }
+.status-badge.idle    { background: var(--paper);  color: var(--ink);   }
+
+.hint {
+    margin: 8px 0 0 0;
+    padding: 8px 12px;
+    background: var(--yellow);
+    border: 2px solid var(--ink);
+    font-size: 14px;
+}
+
+/* ---------------------------------------------- live-activity panel */
+
+.card.live-activity {
+    background: var(--yellow);
+    border-color: var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+}
+.activity-row { margin-top: 12px; }
+.activity-row:first-of-type { margin-top: 0; }
+.activity-id {
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+.activity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.stat-mini {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    padding: 6px 8px;
+    text-align: center;
+}
+.stat-mini .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #555;
+}
+.stat-mini .value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.1;
+}
+.stat-mini.stat-pass    .value { color: var(--green, #2a8a2a); }
+.stat-mini.stat-partial .value { color: var(--accent); }
+.stat-mini.stat-fail    .value { color: #888; }
+.activity-last {
+    font-family: var(--mono);
+    font-size: 13px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--ink);
+}
+.activity-last .dim { color: #666; font-size: 12px; }
+
 /* ----------------------------------------------------------------- buttons */
 
 .btn {
@@ -318,6 +393,13 @@ textarea { min-height: 96px; resize: vertical; font-family: var(--mono); font-si
 }
 
 .btn:hover { background: var(--yellow); color: var(--ink); }
+.btn:disabled, .btn[disabled] {
+    background: #BBB;
+    color: #555;
+    cursor: not-allowed;
+    box-shadow: 2px 2px 0 var(--ink);
+}
+.btn:disabled:hover { background: #BBB; color: #555; }
 
 .btn:active {
     transform: translate(2px, 2px);

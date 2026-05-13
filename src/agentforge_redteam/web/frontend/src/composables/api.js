@@ -8,7 +8,18 @@
  *   loading/error/data + a refetch()." Components that need polling or
  *   refetch-after-mutation use refetch().
  */
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
+
+/**
+ * Module-level shared ref for the "session started" flash on the
+ * SessionView. Lives at module scope so it survives RouterView swaps
+ * (the SessionView component unmounts when you navigate to /coverage
+ * etc., taking its setup-local refs with it; this one stays).
+ *
+ * Shape: `{ kind: "ok" | "error", message: string }` or `null`.
+ * Caller is responsible for clearing it when no longer relevant.
+ */
+export const sessionFlash = ref(null);
 
 export async function api(path, init = {}) {
     const resp = await fetch(path, {
@@ -51,5 +62,48 @@ export function useResource(loader) {
         }
     };
     onMounted(refetch);
+    return { data, loading, error, refetch };
+}
+
+/**
+ * Polled variant of `useResource` — refetches every `intervalMs` while
+ * the component is mounted. Used by the views that watch live sessions
+ * (Coverage, Findings, Queue, SessionView). The polling timer is cleared
+ * on unmount so navigating away stops the chatter.
+ *
+ * The first fetch fires on mount (same as `useResource`); subsequent
+ * fetches do NOT toggle `loading` so the UI does not blink to "loading…"
+ * every few seconds — only the first load shows a spinner.
+ */
+export function usePolledResource(loader, intervalMs = 3000) {
+    const data = ref(null);
+    const loading = ref(true);
+    const error = ref(null);
+    let firstLoadDone = false;
+
+    const refetch = async () => {
+        if (!firstLoadDone) loading.value = true;
+        try {
+            data.value = await loader();
+            error.value = null;
+        } catch (e) {
+            error.value = String(e?.message ?? e);
+        } finally {
+            if (!firstLoadDone) {
+                loading.value = false;
+                firstLoadDone = true;
+            }
+        }
+    };
+
+    let timer = null;
+    onMounted(() => {
+        refetch();
+        timer = setInterval(refetch, intervalMs);
+    });
+    onUnmounted(() => {
+        if (timer !== null) clearInterval(timer);
+    });
+
     return { data, loading, error, refetch };
 }
