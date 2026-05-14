@@ -388,7 +388,13 @@ def test_detect_regression_due_returns_true_on_mismatch(engine: Engine) -> None:
 async def test_orchestrator_halts_on_no_progress(
     engine: Engine, policy: OrchestratorPolicy, base_state: PlatformState
 ) -> None:
-    """Five consecutive fail verdicts in state -> HALT_NO_PROGRESS, no LLM call."""
+    """N consecutive fail verdicts in state -> HALT_NO_PROGRESS, no LLM call.
+
+    Uses ``policy.no_progress_threshold`` directly rather than a hardcoded
+    constant — the production threshold has been bumped (5 → 15) to give
+    the Red Team's mutation loop more room to find variants against the
+    deployed Co-Pilot's defenses.
+    """
     fails = [
         VerdictRecord(
             attack_id=uuid4(),
@@ -397,7 +403,7 @@ async def test_orchestrator_halts_on_no_progress(
             rubric_sha="r",
             model_version="m",
         )
-        for _ in range(5)
+        for _ in range(policy.no_progress_threshold)
     ]
     state = base_state.model_copy(update={"verdict_records": fails})
 
@@ -569,7 +575,7 @@ async def test_halt_order_kill_switch_beats_no_progress(
 async def test_halt_order_no_progress_beats_regression(
     engine: Engine, policy: OrchestratorPolicy, base_state: PlatformState
 ) -> None:
-    """5 fails + prior manifest mismatch: no_progress beats regression_due."""
+    """N fails + prior manifest mismatch: no_progress beats regression_due."""
     _insert_run_manifest(engine, session_id="s-old", target_sha="sha-old")
     fails = [
         VerdictRecord(
@@ -579,7 +585,7 @@ async def test_halt_order_no_progress_beats_regression(
             rubric_sha="r",
             model_version="m",
         )
-        for _ in range(5)
+        for _ in range(policy.no_progress_threshold)
     ]
     state = base_state.model_copy(update={"verdict_records": fails})
 
@@ -724,12 +730,15 @@ def test_recompute_coverage_is_idempotent(engine: Engine) -> None:
 
 def test_production_policy_loads_with_new_fields() -> None:
     """The shipped ``orchestrator_policy.yaml`` parses and carries the
-    Task 37 fields."""
+    Task 37 fields. ``no_progress_threshold`` lives in the YAML — this
+    asserts the production tunable is being picked up, but uses ≥
+    rather than == so calibration changes (the default was bumped from
+    5 to 15) don't require a test edit."""
     p = load_policy(POLICY_PATH)
     assert p.target_runs_per_category is not None
     # The YAML carries all three production categories.
     assert "prompt-injection-indirect" in p.target_runs_per_category
-    assert p.no_progress_threshold == 5
+    assert p.no_progress_threshold >= 5
 
 
 def test_recompute_returns_sorted_rows(engine: Engine) -> None:

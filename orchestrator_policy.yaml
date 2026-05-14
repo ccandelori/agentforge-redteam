@@ -41,4 +41,11 @@ target_runs_per_category:
 # Number of consecutive ``fail`` verdicts (most-recent window) that triggers a
 # ``no_progress`` halt. If the last N attempts in a session all failed, the
 # orchestrator halts so the operator can inspect rather than burn more budget.
-no_progress_threshold: 5
+#
+# Calibrated against the deployed AgentForge Co-Pilot's defenses: at the
+# previous default of 5, every recent session halted before mutation could
+# explore enough variants per (cat, sub_attack) to find a successful one.
+# Empirically the target needs ~15-20 mutation attempts per sub_attack
+# before a finding lands. 15 gives the Red Team three consecutive bites at
+# every sub_attack in a category before the orchestrator gives up.
+no_progress_threshold: 15

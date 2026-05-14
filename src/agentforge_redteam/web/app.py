@@ -535,16 +535,18 @@ def get_session(
             ),
             {"sid": session_id},
         ).first()
-        # We don't have campaign_id on agent_steps; approximate
-        # ``campaigns_run`` via a sub-query against ``attacks``. Tests that
-        # don't insert any attacks see 0 here — which is the right answer
-        # for a freshly-started session.
+        # campaigns_run = number of orchestrator decisions for THIS session.
+        # Each campaign produces exactly one ``campaign_rationale`` LLM call
+        # via the audited wrapper, so counting those rows gives the real
+        # per-session campaign count. The previous version
+        # (`COUNT(DISTINCT a.campaign_id) FROM agent_steps JOIN attacks ON 1=1`)
+        # was a Cartesian-join bug — every session reported the same count
+        # ≈ lifetime distinct campaign_ids, regardless of what actually ran.
         campaigns_row = conn.execute(
             text(
-                "SELECT COUNT(DISTINCT a.campaign_id) AS n "
-                "FROM agent_steps AS s "
-                "JOIN attacks AS a ON 1=1 "
-                "WHERE s.session_id = :sid"
+                "SELECT COUNT(*) AS n "
+                "FROM agent_steps "
+                "WHERE session_id = :sid AND tool = 'campaign_rationale'"
             ),
             {"sid": session_id},
         ).first()
@@ -597,10 +599,10 @@ def list_sessions(op: OperatorDep, engine: EngineDep) -> SessionListResponse:
                         WHERE session_id = rm.session_id
                     ), 0) AS cost_so_far_cents,
                     COALESCE((
-                        SELECT COUNT(DISTINCT a.campaign_id)
-                        FROM attacks a
-                        JOIN agent_steps s ON s.session_id = rm.session_id
-                        WHERE 1=1
+                        SELECT COUNT(*)
+                        FROM agent_steps
+                        WHERE session_id = rm.session_id
+                          AND tool = 'campaign_rationale'
                     ), 0) AS campaigns_run
                 FROM run_manifests rm
                 ORDER BY rm.created_at DESC
