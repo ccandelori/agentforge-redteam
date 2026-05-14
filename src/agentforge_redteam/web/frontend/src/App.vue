@@ -13,7 +13,7 @@ const version = "0.1.0";
 
     <nav class="side">
         <RouterLink to="/ui">SESSION</RouterLink>
-        <RouterLink to="/ui/sessions">SESSIONS</RouterLink>
+        <RouterLink to="/ui/history">HISTORY</RouterLink>
         <RouterLink to="/ui/coverage">COVERAGE</RouterLink>
         <RouterLink to="/ui/findings">FINDINGS</RouterLink>
         <RouterLink to="/ui/queue">QUEUE</RouterLink>

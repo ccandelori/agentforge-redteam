@@ -23,7 +23,7 @@ function capPct(s) {
 </script>
 
 <template>
-    <h2>Sessions</h2>
+    <h2>History</h2>
     <div class="card">
         <p>
             Every session ever dispatched on this platform, newest first.
