@@ -192,10 +192,10 @@ are multi-turn (`max_turns ≥ 2`).
 - **Agents**: 4 LangGraph nodes (Red Team / Judge / Orchestrator / Documentation) wired with Protocol-typed clients via `graph_factory.build_production_graph`
 - **Rubrics**: **6** production rubric YAMLs covering all 6 threat-model categories + 1 example fixture
 - **Attack library**: **27** hand-curated seed payloads (6 prompt-injection-indirect / 6 data-exfiltration / 6 tool-misuse / 3 state-corruption / 3 dos-cost-amplification / 3 identity-role-exploitation), of which 5 are multi-turn (`max_turns: 3`)
-- **Ground truth**: 30 hand-authored Judge cases (10 per MVP category; stretch-category ground truth pending)
-- **Regression corpus**: **6** promoted cases in [`evals/regressions/`](./evals/regressions/), replayable end-to-end via `agentforge-redteam regress` (no FK errors, see `docs/EVIDENCE/regression_replay/` for a captured run)
+- **Ground truth**: **60** hand-authored Judge cases (10 per category × 6 categories) under [`evals/judge_ground_truth/`](./evals/judge_ground_truth/)
+- **Regression corpus**: **6** promoted cases in [`evals/regressions/`](./evals/regressions/), replayable end-to-end via `agentforge-redteam regress` (no FK errors, see [`docs/EVIDENCE/regression_replay/`](./docs/EVIDENCE/regression_replay/) for a captured run). All 6 cases anchored to MVP-judged attacks; stretch-category promotions blocked on attack engineering — see `docs/BUG_LEDGER.md` Diagnosis-only section.
 - **Findings filing path**: GitLab-or-local-file fallback — 3 polished reports in `findings/*_polished.md`
-- **Test suite**: **661** unit + integration tests, mypy strict, ruff clean
+- **Test suite**: **663** unit + integration tests, mypy strict, ruff clean
 
 **What's next**: see [`docs/NEXT-SESSION.md`](./docs/NEXT-SESSION.md) for the live ops
 runbook (deploy, smoke, trigger sessions, watch counters, tail logs) and the

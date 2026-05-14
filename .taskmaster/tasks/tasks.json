@@ -4071,10 +4071,10 @@
       {
         "id": "59",
         "title": "Run a live red-team campaign against deployed target and promote a finding",
-        "description": "Operator action: run start-session against https://104-248-232-22.sslip.io/, capture real audit rows + Langfuse traces, promote one confirmed finding into evals/regressions/. Produces the live evidence the audit identified as missing.",
-        "details": "Currently var/platform.db has data but the evidence is not packaged for submission, and evals/regressions/ does not exist yet. Operator runs: (1) cp .env.example .env, fill ANTHROPIC_API_KEY, OPENAI_API_KEY, LANGFUSE_*, GITLAB_*. (2) Ensure targets.yaml includes droplet_prod = https://104-248-232-22.sslip.io/. (3) uv run python tools/seed_demo_data.py --wipe-only to remove demo rows. (4) uv run agentforge-redteam start-session --target droplet_prod --cost-cap-cents 200 --max-campaigns 2 (Task 56 required). (5) Verify: agent_steps row count > 0 with agent values in {orchestrator, red_team, judge, documentation}. attacks.target_sha matches the live deployment's /health or HEAD sha. Langfuse dashboard shows traces (if configured). At least one finding lands either in findings table or human_approval_queue. (6) Promote any confirmed finding into evals/regressions/<id>.json via 'uv run python -c \"...promote_finding_to_regression...\"' OR a small new CLI subcommand. Commit the promoted JSON. (7) Re-run 'uv run agentforge-redteam regress --target-sha <same sha>' and verify the replay status is 'held' (or 'pass-still-present' depending on Task 51 naming). Acceptance: docs/LIVE_RUN.md captures: session_id, Langfuse trace URL, screenshot of the deployed UI's FINDINGS page showing the real finding, commit hash of the promoted regression case.",
-        "testStrategy": "",
-        "status": "pending",
+        "description": "Operator action: run start-session against the deployed platform, capture real audit rows + Langfuse traces, promote confirmed findings into evals/regressions/. Produces the live evidence the audit identified as missing.",
+        "details": "**COMPLETED** — fully addressed across 6 evidence packages and a regression replay artifact.\n\n**What shipped:**\n\n1. **Live campaigns against the deployed platform** (https://104-248-232-22.sslip.io/) — 5 packaged sessions:\n   - `29488fc5` (initial wedge — surfaced bugs)\n   - `e2590f4c` (post-mutation-fix verification, 2 findings landed)\n   - `ebd35d75` (post-cost-batch verification)\n   - `f044fd18` (cache verification, 9 findings, 95.5% Sonnet cache hit rate)\n   - `b1a35acc` (multi-turn + 6-category verification, all 6 categories visible in coverage_matrix)\n\n2. **Promoted regression cases** — 6 cases under `evals/regressions/`, replayable end-to-end via `agentforge-redteam regress`. SHA-keyed rubric cache (`evals/regressions/.rubric_cache/`) ensures replay scores against the historical rubric, not the current one.\n\n3. **Replay artifact** — `docs/EVIDENCE/regression_replay/2026-05-13-replay-output.txt` captures a clean fresh-checkout replay (held=6, regressed=0, no FK errors).\n\n4. **Live droplet replay** — populated `regression_runs` on the droplet via real-Judge replay against the deployed target. `GET /regressions` now returns 6 rows visible in the SPA's REGRESSIONS page.\n\n5. **Per-session evidence files** — each session dir has session_metadata.json (DB SHA + git SHA provenance), cost_summary.json (per-agent breakdown + cache stats), findings.json, coverage_matrix.json, multi_turn_transcripts.json, and a README mapping the run to reviewer concerns.\n\n6. **Honest gap** — stretch-category regression promotions still pending. Both Cat-4/5/6-only campaigns produced 0 findings (deployed Co-Pilot defends those attacks robustly). Documented in `docs/BUG_LEDGER.md` Diagnosis-only section.",
+        "testStrategy": "Verified live: (1) `curl https://104-248-232-22.sslip.io/coverage` returns rows from all 6 categories, (2) `curl https://104-248-232-22.sslip.io/regressions` returns 6 rows after droplet replay, (3) fresh-checkout `uv run agentforge-redteam regress --target-sha audit-check --root evals/regressions` reports total=6, held=6, regressed=0, no IntegrityError.",
+        "status": "done",
         "dependencies": [
           "56"
         ],
@@ -4126,9 +4126,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-05-13T00:00:00.000Z",
+      "lastModified": "2026-05-14T00:00:00.000Z",
       "taskCount": 62,
-      "completedCount": 60,
+      "completedCount": 61,
       "tags": [
         "master"
       ]
