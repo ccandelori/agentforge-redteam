@@ -7,7 +7,7 @@
   "total_cost_cents_actual_reported": 116,
   "total_cost_usd_actual_reported": 1.16,
   "cost_cap_overshoot_cents": 41,
-  "cost_cap_overshoot_note": "Known issue: cost-cap leakage (NEXT-SESSION.md Known Debt #3). Doc Agent runs after the orchestrator's halt-on-budget check, pushing total over the cap.",
+  "cost_cap_overshoot_note": "Known issue: cost-cap leakage (see docs/BUG_LEDGER.md). Doc Agent runs after the orchestrator's halt-on-budget check, pushing total over the cap.",
   "agent_steps_total": 150,
   "campaigns_run": 9,
   "deployed_platform_url": "https://104-248-232-22.sslip.io/ui/",

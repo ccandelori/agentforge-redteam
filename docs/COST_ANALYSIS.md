@@ -320,7 +320,7 @@ Source: `SELECT agent, COUNT(*), SUM(cost_cents) FROM agent_steps WHERE session_
 | Step | Projected (¢/campaign, quantized) | Measured (¢/campaign) | Delta |
 |---|---|---|---|
 | Orchestrator | 1¢ | 1¢ | 0 |
-| Red Team | 1¢ | 0¢ | **−1¢** (Red Team `cost_cents` reports 0 for `gpt-4o-2024-08-06` — known accounting gap, see NEXT-SESSION.md Known Debt #5) |
+| Red Team | 1¢ | 0¢ | **−1¢** (Red Team `cost_cents` reports 0 for `gpt-4o-2024-08-06` — known accounting gap, tracked in `docs/BUG_LEDGER.md` Diagnosis-only section) |
 | Judge | 4¢ (4 LLM checks) | 3¢ (3 LLM checks) | −1¢ (this session's rubric exercised 3 checks/campaign, matching the "MVP rubrics declare 2–3" caveat in §7 below) |
 | Documentation | — (no-finding path) | — | — |
 | **No-finding total** | **6¢/campaign** | **4¢/campaign** | **−2¢** |
@@ -491,7 +491,7 @@ If the headline figure in this doc and the smoke output disagree by more than 1 
 | Date | Change |
 |---|---|
 | 2026-05-12 | Initial projection-only analysis. Pricing pinned to `cost.py` 2026-05-11 table. |
-| 2026-05-13 | Added "Measured" subsection from session `29488fc5` (5 campaigns, $0.20, no-finding path). Confirmed 3 Judge checks/campaign matching MVP rubric reality. Confirmed Red Team `0¢` accounting gap (NEXT-SESSION.md Known Debt #5). Lifetime finding rate 2/23 ≈ 8.7%. Source dump: `docs/EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json`. |
+| 2026-05-13 | Added "Measured" subsection from session `29488fc5` (5 campaigns, $0.20, no-finding path). Confirmed 3 Judge checks/campaign matching MVP rubric reality. Confirmed Red Team `0¢` accounting gap (tracked in `docs/BUG_LEDGER.md` Diagnosis-only section). Lifetime finding rate 2/23 ≈ 8.7%. Source dump: `docs/EVIDENCE/2026-05-13-session-29488fc5/cost_summary.json`. |
 | 2026-05-13 | Bug discovered + fixed: Red Team's mutation path sent the LLM's JSON envelope to the target as the attack body. Removed corrupted regression case `ab6a68c9`. Finding-rate measurement deferred to first post-fix campaign. |
 | 2026-05-13 | Added "Measured: Session e2590f4c (post-fix verification)" subsection. First measurement of Doc Agent cost (1.25¢/call, 2.5¢/finding — within projection). 6 campaigns, 2 findings, $0.48, clean halt at `no_progress`. Source dump: `docs/EVIDENCE/2026-05-13-session-e2590f4c/cost_summary.json`. |
 | 2026-05-13 | Cost-reduction batch (commit `59f93cb`) verified in session `ebd35d75`. Doc Agent → Haiku: 5¢ → 2¢ (-60%), latency 9.79 s → 3.81 s (2.5x). Red Team accounting: 0¢ → 6¢ (was hidden, now visible). Anthropic prompt caching: deployed but **inactive** because `judge.md` (799 tok) is below the Sonnet 4.6 cache minimum (1024 tok) — `cache_control` block sent but silently ignored. See `docs/BUG_LEDGER.md` Diagnosis corrections. Source dump: `docs/EVIDENCE/2026-05-13-session-ebd35d75/cost_summary.json`. |

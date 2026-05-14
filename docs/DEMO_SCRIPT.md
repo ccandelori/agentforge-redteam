@@ -172,10 +172,10 @@ concern is addressed in this demo:
 - **Stretch-category findings live** — the deployed Co-Pilot defends
   Cat 4/5/6 attacks robustly; two scoped campaigns produced 0
   findings. Documented honestly in
-  `docs/BUG_LEDGER.md` "Diagnosis-only" section and in NEXT-SESSION.md
-  Known Debt #4. The eval-judge harness's 30 stretch ground-truth
-  cases are the testable stretch-category proof; live promotions await
-  better attack engineering.
+  `docs/BUG_LEDGER.md` "Diagnosis-only" section. The eval-judge
+  harness's 30 stretch ground-truth cases are the testable
+  stretch-category proof; live promotions await better attack
+  engineering.
 - **A near-cap `budget_exhausted` halt live** — same blocker (the
   orchestrator halts on `no_progress` before reaching the budget gate
   at MVP attack-engineering scale). Unit test pins the budget-gate

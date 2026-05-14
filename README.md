@@ -73,8 +73,7 @@ Operator CLI (installed by `uv sync`):
 - `agentforge-redteam eval-judge` — run Judge against the ground-truth set
 
 Most live operations are also exposed through the deployed operator UI at
-`https://104-248-232-22.sslip.io/ui/`. See [`docs/NEXT-SESSION.md`](./docs/NEXT-SESSION.md)
-for the canonical command list (deploy, smoke, trigger, watch).
+`https://104-248-232-22.sslip.io/ui/`.
 
 ## Development
 
@@ -197,10 +196,9 @@ are multi-turn (`max_turns ≥ 2`).
 - **Findings filing path**: GitLab-or-local-file fallback — 3 polished reports in `findings/*_polished.md`
 - **Test suite**: **663** unit + integration tests, mypy strict, ruff clean
 
-**What's next**: see [`docs/NEXT-SESSION.md`](./docs/NEXT-SESSION.md) for the live ops
-runbook (deploy, smoke, trigger sessions, watch counters, tail logs) and the
-prioritized debt list. Demo recording and live-evidence packaging are the
-remaining open work for the final gate.
+**What's next**: demo recording and live-evidence packaging are the remaining
+open work for the final gate. Open debt items live in
+[`docs/BUG_LEDGER.md`](./docs/BUG_LEDGER.md) under the "Diagnosis-only" section.
 
 ## License
 

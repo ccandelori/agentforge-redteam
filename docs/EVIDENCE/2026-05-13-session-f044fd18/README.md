@@ -64,9 +64,9 @@ tracking") for the explanation and the path-to-fix if it ever matters.
 ## Cost-cap overshoot (separate known issue)
 
 This session was triggered with a $0.75 cap and reported $1.16 — a
-~$0.40 overshoot. That's the cost-cap leakage bug from
-`docs/NEXT-SESSION.md` Known Debt #3 (Doc Agent runs after the
-orchestrator's halt-on-budget check). Out of scope for this batch.
+~$0.40 overshoot. That's the cost-cap leakage issue tracked in
+`docs/BUG_LEDGER.md` (Doc Agent runs after the orchestrator's
+halt-on-budget check). Out of scope for this batch.
 
 ## What this run produced (numbers)
 

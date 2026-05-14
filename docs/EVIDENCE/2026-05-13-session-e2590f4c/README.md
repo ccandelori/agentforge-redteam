@@ -52,9 +52,9 @@ calls = 1.25¢/call, ≈2.5¢ per finding. That's slightly above the
 projection's 1.3¢/call point estimate but well under the 2¢ quantized
 ceiling.
 
-**Red Team `0¢` accounting gap is still there** (NEXT-SESSION.md
-Known Debt #5) — `gpt-4o-2024-08-06` mutation calls report 0¢. Out of
-scope for this session.
+**Red Team `0¢` accounting gap is still there** (subsequently fixed
+in commit `59f93cb` — see `docs/BUG_LEDGER.md`) — `gpt-4o-2024-08-06`
+mutation calls report 0¢. Out of scope for this session.
 
 ## New findings
 

@@ -8,8 +8,8 @@ Entries are reverse-chronological: newest at the top. Each row links to
 the commit that fixed it and, where applicable, to the live-session
 evidence package that surfaced it.
 
-For open / not-yet-fixed issues, see the "Known debt — prioritized" list
-in [`docs/NEXT-SESSION.md`](./NEXT-SESSION.md).
+For open / not-yet-fixed issues, see the "Diagnosis-only" section
+near the bottom of this file.
 
 ## Format
 
@@ -158,7 +158,7 @@ Verified against session [`ebd35d75`](EVIDENCE/2026-05-13-session-ebd35d75/).
   `cost_estimator=lambda r: int(getattr(r, "cost_cents", 0))`;
   Red Team was missing that one parameter, so the wrapper recorded
   `cost_cents=0` regardless of what `LLMResponse.cost_cents`
-  actually contained. NEXT-SESSION.md Known Debt #5.
+  actually contained.
 - **Impact:** ~12% of session cost was hidden from the platform's
   own accounting. In session `e2590f4c`, real Red Team cost was
   ~6¢/session that showed up as 0¢. At scale the discrepancy would

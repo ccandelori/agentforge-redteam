@@ -46,8 +46,8 @@ steps completed and persisted, total spend $0.20.
 2. **Categories scoping.** Request asked for all 3 MVP categories
    (`prompt-injection-indirect`, `data-exfiltration`, `tool-misuse`).
    Only `prompt-injection-indirect` ran — confirmation of the known
-   `--categories captured but unused` gap (see `docs/NEXT-SESSION.md`
-   Known Debt #4).
+   `--categories captured but unused` gap (subsequently fixed; see
+   `docs/BUG_LEDGER.md` for the wiring change).
 3. **Red Team mutation JSON envelope bug — discovered post-run.** The
    `redteam.md` prompt asks the LLM for a `{"payload": ..., "rationale":
    ..., "mutation_of_attack_id": ...}` envelope. Prior to fix
@@ -104,9 +104,9 @@ What these fixes do NOT do:
 - They do not diagnose the root cause of the 29488fc5 wedge itself
   (most likely a hung Anthropic API call or LangGraph deadlock — needs
   a fresh repro with better instrumentation to nail down).
-- They do not fix the `--categories` scoping gap (NEXT-SESSION.md
-  Known Debt #4) or the per-uvicorn-worker `_active_sessions` set
-  (Known Debt #6).
+- They do not fix the per-uvicorn-worker `_active_sessions` set
+  limitation (single-worker deploy assumption — see
+  `docs/BUG_LEDGER.md` Diagnosis-only section).
 
 ## Langfuse traces
 

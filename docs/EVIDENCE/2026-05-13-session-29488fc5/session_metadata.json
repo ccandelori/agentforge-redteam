@@ -15,7 +15,7 @@
   "categories_actually_run": [
     "prompt-injection-indirect"
   ],
-  "categories_scoping_note": "Known gap: --categories flag captured but unused \u2014 orchestrator enumerates from rubrics directly. See NEXT-SESSION.md known debt #4.",
+  "categories_scoping_note": "Known gap at time of capture: --categories flag captured but unused \u2014 orchestrator enumerates from rubrics directly. Subsequently wired through; see docs/BUG_LEDGER.md.",
   "deployed_platform_url": "https://104-248-232-22.sslip.io/ui/",
   "target_url": "https://143.244.157.90:9300/dashboard/turn",
   "db_snapshot": {

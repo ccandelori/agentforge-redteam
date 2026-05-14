@@ -151,7 +151,6 @@ rsync -az --delete \
     --exclude '.DS_Store' \
     --exclude '*.pyc' \
     --exclude 'src/agentforge_redteam/web/frontend/node_modules' \
-    --exclude 'docs/NEXT-SESSION.md' \
     --exclude 'Week 3*.pdf' \
     -e 'ssh -o BatchMode=yes' \
     "$REPO_ROOT_LOCAL/" \

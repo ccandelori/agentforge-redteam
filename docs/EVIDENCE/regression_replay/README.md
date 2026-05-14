@@ -71,12 +71,10 @@ re-run. The CLI will report `clients: REAL` instead of `NOOP`.
 
 ## What this does NOT yet prove
 
-- The harness still uses **current** rubric YAML bytes by category
-  name, not historical bytes by SHA. After the re-stamp, the SHAs
-  match the current bytes, so it works, but if you edit a rubric
-  YAML, the next replay will warn drift again. Fixing that
-  ("bytes-by-SHA loading" via git-show or a SHA-keyed cache) is
-  Batch C work in `docs/NEXT-SESSION.md`.
+- The SHA-keyed rubric cache (`evals/regressions/.rubric_cache/`)
+  now serves historical rubric bytes by content hash, so edits to
+  current rubric YAML no longer cause drift warnings on replay.
+  See `src/agentforge_redteam/regression/rubric_cache.py`.
 - All 6 regression cases happen to be in the
   `prompt-injection-indirect` and `data-exfiltration` categories. No
   promoted cases yet for `tool-misuse` (clean-payload candidates exist
