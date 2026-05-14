@@ -1,27 +1,23 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { RouterLink } from "vue-router";
 import {
     api,
     apiPost,
     categorySelections,
+    costCapCents,
     sessionFlash,
     usePolledResource,
 } from "../composables/api.js";
 
 const target = ref("droplet_prod");
-const costCap = ref(25);
-// All 6 threat-model categories (THREAT_MODEL.md Table 1). The ref lives
-// at module scope (composables/api.js) so the operator's checkbox
-// selections survive navigating away from SessionView and back —
-// SessionView is unmounted by Vue Router on navigation, and a
-// setup-local ref would reinitialize to defaults on remount.
+// costCap, categories, and flash all live at module scope (composables/api.js)
+// so the operator's last-set values survive a Vue Router navigation away
+// and back. SessionView is unmounted on every nav; setup-local refs would
+// reset to defaults on remount, silently wiping operator intent.
+const costCap = costCapCents;
 const categories = categorySelections;
 const submitting = ref(false);
-// `flash` is the module-level shared ref so the "Session started: …"
-// banner survives navigation away from this view and back. The
-// SessionView component remounts on each visit; setup-local refs would
-// reset to null. See composables/api.js for the ref definition.
 const flash = sessionFlash;
 
 const queue = usePolledResource(() => api("/queue"));
@@ -35,6 +31,36 @@ const activeSessions = usePolledResource(() => api("/sessions/active"));
 const isRunning = computed(() => activeSessions.data.value?.is_running ?? false);
 const activeCount = computed(() => activeSessions.data.value?.count ?? 0);
 const activity = computed(() => activeSessions.data.value?.activity ?? []);
+
+// Auto-clear the green "Session started: …" flash when the session ends.
+// Without this the flash sticks around forever (the ref lives at module
+// scope so it survives navigation).
+//
+// Two cases to handle:
+//   (a) Operator is on the SESSION page when the session ends — caught by
+//       the isRunning true → false transition watcher.
+//   (b) Operator started a session, navigated to e.g. HISTORY, the
+//       session ended while they were away, then they came back. On
+//       remount the watcher's "prev" is undefined; the transition never
+//       fires. So we ALSO clear after the first poll if isRunning is
+//       false at that point and flash is ok.
+//
+// Errors (flash.kind === 'error') stay visible because the operator may
+// want to read them; they dismiss on the next successful start.
+watch(isRunning, (now, prev) => {
+    if (prev === true && now === false && flash.value?.kind === "ok") {
+        flash.value = null;
+    }
+});
+watch(
+    () => activeSessions.loading.value,
+    (loadingNow, loadingPrev) => {
+        if (loadingPrev === true && loadingNow === false && !isRunning.value && flash.value?.kind === "ok") {
+            flash.value = null;
+        }
+    },
+    { immediate: true },
+);
 
 // Human-friendly relative-time for the "last step at" stamp. Re-evaluates
 // every poll tick because activity is a polled resource — no need for a

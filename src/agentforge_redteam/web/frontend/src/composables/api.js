@@ -43,6 +43,16 @@ export const categorySelections = ref({
     "identity-role-exploitation": false,
 });
 
+/**
+ * Module-level shared ref for the SessionView's cost-cap input value.
+ * Same lifetime story as `categorySelections` and `sessionFlash`:
+ * lives at module scope so the operator's last-set cap survives a
+ * navigation away from the SESSION page and back. Default 25¢ is the
+ * cheap-smoke-test default; operator changes persist for the life of
+ * the SPA tab.
+ */
+export const costCapCents = ref(25);
+
 export async function api(path, init = {}) {
     const resp = await fetch(path, {
         credentials: "same-origin",
