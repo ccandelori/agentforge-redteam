@@ -19,13 +19,14 @@ severity_weights:
 
 # Budget caps. Hard limits — orchestrator halts on either.
 max_session_cost_cents: 1000        # $10.00 per session
-default_campaign_budget_cents: 15   # $0.15 per-campaign budget reservation
-# Calibrated to measured per-campaign cost from live evidence runs (see
-# docs/EVIDENCE/): typical campaign costs 2-13¢ — 15¢ leaves headroom
-# while letting modest caps (25¢ → 1 campaign, 100¢ → ~10 campaigns)
-# actually run. The previous default of 50¢ insta-halted any session
-# whose cap was below 55¢ once the operator's cap actually started
-# being enforced (commit ce68814).
+default_campaign_budget_cents: 15   # CampaignBrief.budget_cents value
+# This is now ONLY the per-campaign hint stamped onto CampaignBrief —
+# the orchestrator's budget gate no longer reserves it (the gate
+# checks `cost_so_far + 5¢ doc reserve > cap`, which lets the
+# operator's UI cap mean what it says rather than "cap minus a
+# reservation"). The 15¢ value here is a vestigial guidance hint;
+# Red Team and Judge don't currently enforce it, but downstream
+# consumers may want the value. Safe to leave as-is.
 
 # Canary cadence. After every N non-canary campaigns, insert one canary.
 # Bumped to 9999 for the MVP demo — the canary check fires when

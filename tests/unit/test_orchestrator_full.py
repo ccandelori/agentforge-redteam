@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from random import Random
 from typing import Any
@@ -625,14 +626,19 @@ async def test_halt_order_regression_beats_budget(
 async def test_halt_order_budget_beats_no_candidates(
     engine: Engine, tmp_path: Path, base_state: PlatformState
 ) -> None:
-    """Budget exhausted + empty rubric dir: budget wins (sits above no_candidates)."""
-    p = _write_policy(tmp_path, max_session_cost_cents=10, default_campaign_budget_cents=100)
+    """Budget exhausted + empty rubric dir: budget wins (sits above no_candidates).
+
+    Math under the new gate (``cost_so_far + 5¢ doc_reserve > cap``):
+    cost_so_far=$0.06 → 6 + 5 = 11 > 10 cap → HALT_BUDGET.
+    """
+    p = _write_policy(tmp_path, max_session_cost_cents=10)
     policy = load_policy(p)
     empty_rubrics = tmp_path / "empty"
     empty_rubrics.mkdir()
+    state = base_state.model_copy(update={"cost_so_far": Decimal("0.06")})
 
     new_state = await orchestrator_node(
-        base_state,
+        state,
         engine=engine,
         llm=_FakeLLM(),
         policy=policy,

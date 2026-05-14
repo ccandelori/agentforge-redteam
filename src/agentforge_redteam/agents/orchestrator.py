@@ -495,21 +495,23 @@ async def orchestrator_node(
         return _halt(state, HALT_REGRESSION_DUE)
 
     # ---- 4. Budget gate --------------------------------------------------
-    # ``cost_so_far`` is stored in dollars (Decimal). We compare in cents
-    # against the policy's integer cap so the per-cent rounding stays
-    # honest.
+    # Cap = cap. The only reservation is _DOC_AGENT_RESERVE_CENTS — a
+    # follow-on doc-agent call that fires AFTER the orchestrator returns
+    # if the campaign that just ran produced a pass verdict. Without it,
+    # a finding in the last campaign before halt could push 5¢ over the
+    # operator's cap. See docs/BUG_LEDGER.md "Cost cap leakage".
     #
-    # Reserve includes:
-    #   default_campaign_budget_cents: full budget for the next campaign
-    #     (red_team mutation + target POST + 3-5 judge checks).
-    #   _DOC_AGENT_RESERVE_CENTS: a follow-on doc-agent call that fires
-    #     AFTER the orchestrator returns if the next campaign produces a
-    #     pass verdict. Without this, sessions can land 5-10¢ over the
-    #     cap when a finding lands in the last campaign before halt.
-    #     See BUG_LEDGER.md ("Cost cap leakage") and live overshoot
-    #     observed in session f044fd18 ($0.75 cap → $1.16 actual).
+    # Earlier versions also reserved ``policy.default_campaign_budget_cents``
+    # for the next campaign. That value (50, briefly 15) was an
+    # over-estimate of measured per-campaign cost (~2-13¢ across 5 live
+    # sessions) and made the operator's cap a confusing "cap minus
+    # reservation" rather than the cap they actually set in the UI.
+    # Dropped: the orchestrator now simply asks "do I have at least the
+    # doc-agent reserve worth of headroom left?" before starting another
+    # campaign. ``cost_so_far`` is stored in dollars (Decimal); we
+    # compare in cents.
     cost_so_far_cents = int(state.cost_so_far * Decimal(100))
-    projected = cost_so_far_cents + policy.default_campaign_budget_cents + _DOC_AGENT_RESERVE_CENTS
+    projected = cost_so_far_cents + _DOC_AGENT_RESERVE_CENTS
     if projected > policy.max_session_cost_cents:
         return _halt(state, HALT_BUDGET)
 

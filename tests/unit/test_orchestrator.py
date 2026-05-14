@@ -451,17 +451,16 @@ async def test_orchestrator_node_kill_switch_halts(
 async def test_orchestrator_node_budget_halts(
     engine: Engine, tmp_path: Path, base_state: Any
 ) -> None:
-    """Project cost above the session cap -> halt with ``HALT_BUDGET``."""
-    # Tight cap: 100 cents max, 60 cents per campaign. Seeding 50 cents
-    # in cost_so_far makes the projected next campaign
-    # (50 + 60 + 5 reserve = 115) exceed the 100 cap.
+    """``cost_so_far + 5¢ reserve > cap`` -> halt with ``HALT_BUDGET``."""
+    # Tight cap: 100c. Seeding 96c in cost_so_far makes the projection
+    # (96 + 5 reserve = 101) exceed the 100 cap.
     p = _write_policy(
         tmp_path,
         max_session_cost_cents=100,
-        default_campaign_budget_cents=60,
+        default_campaign_budget_cents=60,  # no longer reserved by the gate
     )
     policy = load_policy(p)
-    state = base_state.model_copy(update={"cost_so_far": Decimal("0.50")})
+    state = base_state.model_copy(update={"cost_so_far": Decimal("0.96")})
 
     llm = _FakeLLM()
     new_state = await orchestrator_node(
@@ -480,34 +479,29 @@ async def test_orchestrator_node_budget_halts(
 async def test_orchestrator_node_doc_agent_reserve_halts_before_overshoot(
     engine: Engine, tmp_path: Path, base_state: Any
 ) -> None:
-    """Boundary test for ``_DOC_AGENT_RESERVE_CENTS`` (commit ``d73f2bc``).
+    """Boundary test for ``_DOC_AGENT_RESERVE_CENTS``.
 
-    Without the 5-cent reserve, the budget gate would project
-    ``cost_so_far_cents (35) + default_campaign_budget_cents (60) = 95``,
-    which is ``<= max_session_cost_cents (100)`` — the gate would let
-    one more campaign run, and a doc-agent finding-write afterwards
-    could push total spend over the cap. With the reserve the
-    projection is ``35 + 60 + 5 = 100``, which is also ``<= 100`` and
-    still permits the campaign. Bumping ``cost_so_far`` by one more
-    cent (to 36) flips the projection to ``101 > 100`` and the gate
-    must halt.
+    The orchestrator's budget gate is ``cost_so_far + 5¢ reserve > cap``.
+    The 5¢ reserve guards against the doc-agent finding-write that fires
+    AFTER the orchestrator returns if the campaign produced a pass. At
+    the exact boundary (cap=100):
+      cost_so_far=96c → projected = 96 + 5 = 101 > 100 → MUST halt.
+      cost_so_far=94c → projected = 94 + 5 =  99 ≤ 100 → MUST proceed.
 
-    This test pins the reserve's behavior at the exact boundary — a
-    future refactor that removes ``_DOC_AGENT_RESERVE_CENTS`` would
-    let the 36-cent state slip through and cause cap overshoot in
-    production. Live verification of this is in
-    ``docs/EVIDENCE/2026-05-13-session-86d8bace`` (25-cent cap session
-    halted at 18 cents reported, well under cap).
+    A future refactor that removes the reserve would let the 96-cent
+    state slip through and let a doc-agent call push total spend over
+    the operator's cap — exactly the leakage `BUG_LEDGER.md` "Cost cap
+    leakage" entry documented.
     """
     p = _write_policy(
         tmp_path,
         max_session_cost_cents=100,
-        default_campaign_budget_cents=60,
+        default_campaign_budget_cents=60,  # no longer used by the gate
     )
     policy = load_policy(p)
 
-    # cost_so_far = $0.36 -> projected = 36 + 60 + 5 = 101 > 100 -> HALT.
-    state_above = base_state.model_copy(update={"cost_so_far": Decimal("0.36")})
+    # cost_so_far = $0.96 -> projected = 96 + 5 = 101 > 100 -> HALT.
+    state_above = base_state.model_copy(update={"cost_so_far": Decimal("0.96")})
     llm_above = _FakeLLM()
     result_above = await orchestrator_node(
         state_above,
@@ -518,15 +512,15 @@ async def test_orchestrator_node_doc_agent_reserve_halts_before_overshoot(
         rubrics_dir=RUBRICS_DIR,
     )
     assert result_above.halt_reason == HALT_BUDGET, (
-        "with the doc-agent reserve, cost_so_far=$0.36 + 60c next + 5c reserve "
-        "= 101c > 100c cap should HALT. If this test fails, the reserve was "
-        "removed or shrunk — see d73f2bc and docs/BUG_LEDGER.md."
+        "with the doc-agent reserve, cost_so_far=$0.96 + 5c reserve = 101c "
+        "> 100c cap should HALT. If this test fails, the reserve was removed "
+        "or shrunk — see docs/BUG_LEDGER.md 'Cost cap leakage'."
     )
 
-    # cost_so_far = $0.34 -> projected = 34 + 60 + 5 = 99 <= 100 -> proceeds.
+    # cost_so_far = $0.94 -> projected = 94 + 5 = 99 <= 100 -> proceeds.
     # The orchestrator picks a campaign (current_campaign set, halt_reason
     # None). LLM is called for the rationale.
-    state_below = base_state.model_copy(update={"cost_so_far": Decimal("0.34")})
+    state_below = base_state.model_copy(update={"cost_so_far": Decimal("0.94")})
     llm_below = _FakeLLM()
     result_below = await orchestrator_node(
         state_below,
