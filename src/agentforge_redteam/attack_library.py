@@ -21,7 +21,22 @@ ATTACK_LIBRARY_PATH: Final[Path] = Path("attack_library.json")
 
 
 class AttackSeed(BaseModel):
-    """One hand-crafted seed payload from attack_library.json."""
+    """One hand-crafted seed payload from attack_library.json.
+
+    Single-turn vs multi-turn
+    -------------------------
+    Default is single-turn: ``max_turns=1`` and ``multi_turn_strategy=None``.
+    A seed becomes multi-turn by setting ``max_turns >= 2`` AND providing
+    a ``multi_turn_strategy`` (a one-paragraph hint the Red Team LLM uses
+    to decide what to send on turns 2..N given the prior responses).
+
+    The target API (`AgentForge /dashboard/turn`) is stateless: each POST
+    is a fresh request. The Red Team Agent works around this by embedding
+    the prior conversation transcript into each turn's payload as a
+    "previously in this conversation" prefix, so the target can be probed
+    with conversation-style attacks (trust-then-escalate, role-establish-
+    then-exploit, fake-history injection) without target-side support.
+    """
 
     model_config = {"frozen": True, "extra": "forbid"}
 
@@ -29,6 +44,8 @@ class AttackSeed(BaseModel):
     sub_attack: str = Field(min_length=1)
     payload: str = Field(min_length=1, max_length=4000)
     notes: str = Field(min_length=1)
+    max_turns: int = Field(default=1, ge=1, le=5)
+    multi_turn_strategy: str | None = Field(default=None, max_length=2000)
 
 
 class AttackLibrary(BaseModel):

@@ -46,6 +46,26 @@ class CampaignBrief(BaseModel):
         return self
 
 
+class AttackTurn(BaseModel):
+    """One turn in a multi-turn attack: the user message sent and the target's response.
+
+    For single-turn attacks the AttackRecord's ``turns`` list has length 1
+    and its single element duplicates the record's top-level ``payload`` /
+    ``target_response`` / ``target_sha`` / ``status_code`` fields. For
+    multi-turn attacks each loop iteration appends a new turn and the
+    record's top-level fields mirror the FINAL turn (so single-turn-only
+    Judge code keeps working unchanged).
+    """
+
+    model_config = {"frozen": True, "extra": "forbid"}
+
+    user_payload: str = Field(min_length=1)
+    target_response: str
+    target_sha: str = Field(min_length=1)
+    status_code: int = Field(ge=100, le=599)
+    latency_ms: int = Field(ge=0)
+
+
 class AttackRecord(BaseModel):
     """One adversarial probe sent to the target and the response received.
 
@@ -53,6 +73,12 @@ class AttackRecord(BaseModel):
     refuses silently or 204s us. ``target_sha`` ties the record to a specific
     build of the target so a verdict isn't accidentally compared against a
     later, patched build.
+
+    Multi-turn note: ``payload`` and ``target_response`` (and the
+    ``target_sha`` / ``status_code`` / ``latency_ms`` siblings) reflect
+    the FINAL turn for backward compatibility with single-turn Judge code.
+    The full transcript lives in ``turns``; len(turns) == 1 for the common
+    single-turn case.
     """
 
     attack_id: UUID = Field(default_factory=uuid4)
@@ -62,6 +88,7 @@ class AttackRecord(BaseModel):
     target_sha: str = Field(min_length=1)
     status_code: int = Field(ge=100, le=599)
     latency_ms: int = Field(ge=0)
+    turns: list[AttackTurn] = Field(default_factory=list)
 
 
 class VerdictRecord(BaseModel):

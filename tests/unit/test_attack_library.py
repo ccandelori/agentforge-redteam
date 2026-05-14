@@ -33,7 +33,7 @@ EXPECTED_CATEGORIES = {
 def test_load_attack_library_returns_version_1_and_fifteen_seeds() -> None:
     library = load_attack_library()
     assert library.version == 1
-    assert len(library.attacks) == 16
+    assert len(library.attacks) == 18
 
 
 def test_library_contains_exactly_the_three_mvp_categories() -> None:
@@ -76,7 +76,7 @@ def test_marker_token_reproduction_payload_anchors_threat_model_design() -> None
 
 def test_seeds_for_category_returns_five_data_exfiltration_seeds() -> None:
     seeds = seeds_for_category("data-exfiltration")
-    assert len(seeds) == 5
+    assert len(seeds) == 6
     assert all(seed.category == "data-exfiltration" for seed in seeds)
 
 
