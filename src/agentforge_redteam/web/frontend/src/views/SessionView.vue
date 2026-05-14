@@ -158,7 +158,7 @@ async function start() {
                 <option value="localhost_dev_easy">localhost_dev_easy → http://localhost:8000</option>
             </select>
 
-            <label>Attack categories <span style="font-weight: normal; opacity: 0.7;">(MVP on by default; stretch off)</span></label>
+            <label>Attack categories</label>
             <div class="checkbox-row">
                 <label><input type="checkbox" v-model="categories['prompt-injection-indirect']"> prompt-injection-indirect</label>
                 <label><input type="checkbox" v-model="categories['data-exfiltration']"> data-exfiltration</label>
