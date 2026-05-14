@@ -20,6 +20,77 @@ reviewer-visible consequence), **Resolution** (the fix), **Surfaced by**
 
 ---
 
+## 2026-05-14 — Eval proof for Cat 4/5/6 (commits `9215f1a`, `a6be982`)
+
+### 8. (Audit) Judge ground-truth coverage stopped at 3 categories
+
+- **Bug:** the original ground-truth corpus had 10 cases per MVP
+  category (data-exfiltration, prompt-injection-indirect, tool-misuse)
+  = 30 total. Categories 4 / 5 / 6 (state-corruption,
+  dos-cost-amplification, identity-role-exploitation) had zero
+  Judge ground-truth coverage. Reviewer flagged this directly.
+- **Impact:** even after the Cat 4/5/6 rubrics + seeds shipped in
+  `fc354f6`, there was no way to assert that the Judge correctly
+  scores stretch-category attacks. A drift in stretch rubrics or
+  the Judge model would go undetected.
+- **Resolution:** Commit **[`9215f1a`](https://gitlab.com/cameroncandelori/agentforgeredteam/-/commit/9215f1a)**
+  adds 30 hand-authored ground-truth cases (10 per stretch
+  category), authored by 3 parallel subagents. Each category's 10
+  cases follow the existing schema: 5 pass / 3 fail / 1 partial /
+  1 inconclusive distribution; all 5 rubric checks fired in ≥1
+  case. Loosened the prior `==30` test assertion to `≥10 per MVP`
+  so adding stretch cases doesn't break the count check.
+  Total corpus now 60 cases.
+
+### 9. (Audit) Test for `_DOC_AGENT_RESERVE_CENTS` boundary
+
+- **Bug:** the doc-agent budget reserve (commit `d73f2bc`) was
+  reasonable on paper but had no direct unit test pinning its
+  boundary — the audit explicitly called this out.
+- **Impact:** a future refactor that removes / shrinks
+  `_DOC_AGENT_RESERVE_CENTS` would let cost overshoot back into
+  production silently. Live evidence (session `86d8bace`) showed
+  the cap respected at 25¢ → $0.18, but a unit-level proof at
+  the exact boundary was missing.
+- **Resolution:** Commit `9215f1a` adds
+  `test_orchestrator_node_doc_agent_reserve_halts_before_overshoot`
+  in `tests/unit/test_orchestrator.py`. Pins the reserve at the
+  exact 100¢-cap boundary: cost_so_far=$0.36 + 60¢ + 5¢ = 101¢ →
+  MUST halt; cost_so_far=$0.34 + 60¢ + 5¢ = 99¢ → MUST proceed.
+  Failing this test catches a reserve-removal regression locally.
+
+## Diagnosis-only — no platform code change
+
+### Stretch-category regression promotions blocked on attack engineering
+
+- **Original framing (Batch B plan):** "live finding-rich campaign
+  that produces Cat 4/5/6 findings → promote one per stretch
+  category."
+- **What actually happened:** Two campaigns scoped to stretch
+  categories only (sessions `f4bdbf6c` 100¢ cap, `a763e694` 200¢
+  cap) both halted at `no_progress` after 18 campaigns each with
+  **0 findings**. The deployed AgentForge Co-Pilot defended every
+  one of the 9 stretch sub_attacks across both attempts, including
+  multi-turn build-trust-then-escalate variants. `--categories`
+  scoping verifiably worked (coverage_matrix shows the 5
+  exercised stretch sub_attacks; rubric SHAs confirmed stretch
+  judging fired); the target just didn't yield.
+- **Why this is not a code-side fix:** the platform CAN exercise
+  all 6 categories live (proven in session `b1a35acc` and these
+  two stretch-only runs). The platform CAN promote any finding
+  to a regression case (`promote_finding_to_regression` in
+  `regression/harness.py`). The blocker is that no stretch finding
+  has landed yet — that's an attack-engineering concern (better
+  multi-turn strategies, more aggressive payload mutation, or a
+  less-defended target build), not a platform capability.
+- **Path forward (post-final-gate):** a focused attack-engineering
+  pass on stretch categories. Likely fertile angles per
+  THREAT_MODEL.md Cat 4–6 sections: deeper context-poisoning
+  multi-turn (currently 3-turn max), recursive-reasoning DoS
+  framings, social-engineering authority claims that bypass the
+  target's standard refusal patterns. Until at least one such
+  attack lands, the regression corpus stays MVP-only (6 cases).
+
 ## 2026-05-13 — Cost cap leakage fix (commit `d73f2bc`)
 
 ### 6. Doc Agent inflated `state.cost_so_far` by 100x on every call
