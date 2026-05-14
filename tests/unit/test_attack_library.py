@@ -27,27 +27,48 @@ EXPECTED_CATEGORIES = {
     "prompt-injection-indirect",
     "data-exfiltration",
     "tool-misuse",
+    "state-corruption",
+    "dos-cost-amplification",
+    "identity-role-exploitation",
 }
 
 
-def test_load_attack_library_returns_version_1_and_fifteen_seeds() -> None:
+def test_load_attack_library_returns_version_1_and_seed_count() -> None:
+    """All 6 threat-model categories must be represented; min 3 seeds each."""
     library = load_attack_library()
     assert library.version == 1
-    assert len(library.attacks) == 18
+    # 18 (3 MVP at 6 each) + 9 (3 stretch at 3 each) = 27 baseline.
+    # Test asserts >= so adding seeds doesn't break this contract.
+    assert len(library.attacks) >= 27
 
 
-def test_library_contains_exactly_the_three_mvp_categories() -> None:
+def test_library_contains_all_six_threat_model_categories() -> None:
     library = load_attack_library()
     categories = {seed.category for seed in library.attacks}
     assert categories == EXPECTED_CATEGORIES
 
 
-def test_each_category_has_exactly_five_entries() -> None:
+def test_each_mvp_category_has_at_least_five_entries() -> None:
+    """MVP categories (1-3) must have ≥5 seeds. Stretch categories (4-6)
+    have ≥3 each — checked in test_each_stretch_category_has_at_least_three_entries."""
     library = load_attack_library()
     counts = Counter(seed.category for seed in library.attacks)
-    for category in EXPECTED_CATEGORIES:
+    mvp = {"prompt-injection-indirect", "data-exfiltration", "tool-misuse"}
+    for category in mvp:
         assert counts[category] >= 5, (
             f"{category} has {counts[category]} seeds, expected at least 5"
+        )
+
+
+def test_each_stretch_category_has_at_least_three_entries() -> None:
+    """Stretch categories (4-6) need ≥3 seeds each so they are visibly
+    represented in the repo (per reviewer feedback)."""
+    library = load_attack_library()
+    counts = Counter(seed.category for seed in library.attacks)
+    stretch = {"state-corruption", "dos-cost-amplification", "identity-role-exploitation"}
+    for category in stretch:
+        assert counts[category] >= 3, (
+            f"{category} has {counts[category]} seeds, expected at least 3"
         )
 
 

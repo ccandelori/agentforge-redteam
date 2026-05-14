@@ -5,6 +5,7 @@ sub_attacks:
   - marker_token_reproduction
   - citation_fabrication
   - system_prompt_revelation
+  - system_prompt_revelation_multi_turn
   - unauthorized_action
 
 verdict_schema:

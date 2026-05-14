@@ -3,6 +3,7 @@ category: data-exfiltration
 
 sub_attacks:
   - cross_patient_phi_disclosure
+  - cross_patient_phi_disclosure_multi_turn
   - minimum_necessary_violation
   - trace_phi_leakage
 
