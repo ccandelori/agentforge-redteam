@@ -85,6 +85,58 @@ uv run ruff format --check src/ tests/     # formatting
 uv run mypy src/                           # strict type-check
 ```
 
+## Verifying from a fresh checkout
+
+A grader / reviewer can verify every load-bearing claim in this repo
+with the following sequence after `git clone` + `uv sync`:
+
+```bash
+# 1. Full test suite — must finish green.
+uv run pytest --no-header -q
+# expected: "663 passed"
+
+# 2. Confirm the 6-category coverage. All 6 threat-model categories
+# must have a rubric YAML and ≥3 attack seeds.
+ls rubrics/*.yaml
+# expected: data-exfiltration / dos-cost-amplification /
+#           identity-role-exploitation / prompt-injection-indirect /
+#           state-corruption / tool-misuse  (6 files)
+uv run python -c "import json, collections; \
+  cats = collections.Counter(s['category'] for s in \
+    json.load(open('attack_library.json'))['attacks']); \
+  print('\n'.join(f'{c}: {n}' for c, n in sorted(cats.items())))"
+# expected: 6 categories, total 27 seeds (≥6 per MVP, ≥3 per stretch)
+
+# 3. Confirm Judge ground truth covers all 6 categories (≥10 each).
+ls evals/judge_ground_truth/
+for d in evals/judge_ground_truth/*/; do
+  echo "$(basename "$d"): $(ls "$d" | wc -l | tr -d ' ') cases"
+done
+# expected: 6 categories, 10 cases each, 60 total
+
+# 4. Regression replay — must run cleanly (no FK errors, no drift
+# warnings) from a fresh DB. NOOP clients are fine for the smoke;
+# set ANTHROPIC_API_KEY for a real Judge replay.
+rm -f /tmp/regress_audit.db
+PLATFORM_DB_PATH=/tmp/regress_audit.db uv run alembic upgrade head
+PLATFORM_DB_PATH=/tmp/regress_audit.db uv run agentforge-redteam regress \
+    --target-sha audit-check --root evals/regressions
+# expected: total: 6, held: 6, regressed: 0  (no IntegrityError)
+
+# 5. Live deployed platform — operator UI + healthz.
+curl -sS -o /dev/null -w "%{http_code}\n" https://104-248-232-22.sslip.io/healthz
+# expected: 200
+# UI:  https://104-248-232-22.sslip.io/ui/    (BasicAuth — see /etc/agentforge-redteam/redteam.env on the droplet)
+# All 6 categories visible in the platform's own coverage matrix:
+#   curl -u $WEB_UI_USER:$WEB_UI_PASSWORD https://104-248-232-22.sslip.io/coverage | jq '[.rows[].category] | unique'
+```
+
+For the bug-and-fix history (every issue we've found and how it was
+resolved), see [`docs/BUG_LEDGER.md`](./docs/BUG_LEDGER.md). For
+per-session evidence packages (DB SHAs, cost summaries, multi-turn
+transcripts, regression replay output), see
+[`docs/EVIDENCE/`](./docs/EVIDENCE/).
+
 ## Project layout
 
 ```

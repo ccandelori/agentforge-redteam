@@ -1,6 +1,6 @@
 # NEXT-SESSION.md — agentforge-redteam
 
-**Last updated**: 2026-05-13 (post cost-reduction + cache verification).
+**Last updated**: 2026-05-14 (post audit-response — Batches A/B/C).
 
 This file is the first thing to read at the start of any new session.
 It supersedes the prior planning-era version. What's shipped, what's
@@ -10,14 +10,23 @@ broken, what to pick up next.
 
 ## Status
 
-MVP + cost-reduction + cache verification all shipped. Live platform
-at `https://104-248-232-22.sslip.io/ui` with HTTPS. Five live evidence
-packages under [`docs/EVIDENCE/`](EVIDENCE/) tell the story end-to-end:
-initial wedge → mutation parser fix → halt persistence → cost batch
-(partly inactive) → Judge cache verified engaging (95.5% hit rate on
-Sonnet). Six promoted regression cases under `evals/regressions/`
-across three attack categories. Bug-find-and-fix history in
-[`docs/BUG_LEDGER.md`](BUG_LEDGER.md). All code on `main`.
+MVP + audit response all shipped. Live platform at
+`https://104-248-232-22.sslip.io/ui/` with HTTPS. **All 6 threat-model
+categories** now have rubrics, ≥3 attack seeds each, and 10
+judge-ground-truth cases each (60 total). Six promoted regression
+cases in `evals/regressions/` (all anchored to MVP-judged attacks;
+stretch promotions blocked on attack engineering, see Known Debt #4).
+Regression replay runs cleanly from a fresh checkout (no FK errors,
+no rubric-drift warnings — SHA-keyed rubric cache loads historical
+bytes by content hash). Live evidence under
+[`docs/EVIDENCE/`](EVIDENCE/) — 5 session packages + a regression
+replay artifact. Bug-find-and-fix history (11 entries) in
+[`docs/BUG_LEDGER.md`](BUG_LEDGER.md). 663 tests green;
+ruff/format/mypy clean. All code on `main`.
+
+For a fresh-checkout grader-friendly verification sequence, see the
+"Verifying from a fresh checkout" section in
+[`README.md`](../README.md).
 
 ## Live URLs
 
@@ -74,9 +83,29 @@ uv run agentforge-redteam start-session \
 git push origin <branch>
 ```
 
-## What shipped this session (2026-05-13, most recent first)
+## What shipped this session (2026-05-13/14, most recent first)
+
+Audit-response batches:
 
 ```
+7689883 feat(regression): SHA-keyed rubric cache + multi-turn full transcripts
+679ecd6 docs(ledger): record Batch B status — ground truth done, stretch promotions blocked on attack engineering
+9215f1a feat(eval): 30 new ground-truth cases (Cat 4/5/6) + doc-agent reserve test
+a6be982 fix(audit-batch-a): regression replay clean + 6-cat surfacing
+2a5842e ui(spa): rename Sessions page to History
+a65769d feat(spa): Sessions + Regressions pages — Phase B inspectability
+3705d7f docs(evidence): session b1a35acc — 6-category coverage + multi-turn live
+fc354f6 feat(rubrics): add Categories 4/5/6 — 6 categories now fully represented
+71074ba feat(red_team): adaptive multi-turn attacks with embedded conversation context
+```
+
+Earlier this session (cost reduction + cache verification):
+
+```
+fa781bb docs(ledger): record cost-cap leakage fix (entries 6 + 7)
+6e39381 chore(format): ruff auto-format pass on orchestrator + anthropic_client
+d73f2bc fix(cost): doc agent cents/dollars + budget gate doc-agent reserve
+334b602 docs(session): refresh NEXT-SESSION.md after cost-reduction batch
 4e35a78 docs(evidence): session f044fd18 — cache verified + 3 new regression cases
 4e87725 docs(ledger): record cache verification + integer-cent rounding gap
 33598cf obs(cost): structured-log Anthropic usage block per call
@@ -94,9 +123,10 @@ abea14d docs(evidence): session ebd35d75 — cost-reduction batch verification
 be0edf5 docs(reviewer): surface deployed platform URL, retire stale claims
 ```
 
-15 commits direct-to-main, all green (649 tests, ruff/mypy clean).
-Evidence packaged across 5 live sessions in `docs/EVIDENCE/`. Bugs
-found-and-fixed indexed in `docs/BUG_LEDGER.md`.
+24 commits direct-to-main, all green (663 tests, ruff/format/mypy clean).
+Evidence packaged across 5 live sessions in `docs/EVIDENCE/` + a
+regression replay artifact. Bugs found-and-fixed indexed in
+`docs/BUG_LEDGER.md` (11 entries).
 
 ## Known debt — prioritized
 
@@ -120,48 +150,38 @@ section lists what's still open.
    campaigns_run % N == 0`. Then drop N back to a sensible value (10
    or 20) so drift detection actually runs.
 
-3. **Cost cap leakage** (still open, observed live in session
-   `f044fd18`: $0.75 cap, $1.16 actual). The orchestrator halts when
-   its tally reaches the cap, but the Doc Agent's LLM call (~3¢ per
-   finding) runs AFTER that halt and pushes total spend over.
-   **Fix**: pre-budget the doc-agent cost when computing
-   `proceed_or_halt`, or just subtract a 5¢ reserve from the
-   effective cap.
-
-4. **Wedge root cause not diagnosed.** Session `29488fc5` hung
+3. **Wedge root cause not diagnosed.** Session `29488fc5` hung
    silently between campaigns 5 and 6. Symptom is now bounded by the
    30-min wall-clock timeout (commit `227753d`), but the underlying
    cause (most likely a hung Anthropic API call or a LangGraph
    routing deadlock) is unknown. Did NOT recur in any subsequent
    session, but no diagnosis means we can't say it won't.
 
+4. **Stretch-category regression promotions blocked on attack
+   engineering.** Two live campaigns scoped to Cat 4/5/6 only
+   (`f4bdbf6c` 100¢ cap, `a763e694` 200¢ cap) both halted at
+   `no_progress` with **0 findings**. The deployed Co-Pilot defends
+   the 9 stretch sub_attacks robustly. Need a focused
+   attack-engineering pass (deeper multi-turn, better social
+   engineering, less-defended target build) to land at least one
+   stretch finding so it can be promoted to `evals/regressions/`.
+   See `docs/BUG_LEDGER.md` "Diagnosis-only" section.
+
 ### Medium
 
-5. **`--categories` flag is captured but unused**
-   (`session_runner.py:233` — `TODO(category-filter)`). The orchestrator
-   enumerates from `rubrics/` directly. Wire it through so an operator
-   can scope a run to one category. ~1 hour fix.
-
-6. **`/sessions/active` is in-memory per-uvicorn-worker**. Restart wipes
+5. **`/sessions/active` is in-memory per-uvicorn-worker**. Restart wipes
    the running-session set. Two workers each track their own. For the
    single-worker MVP it's fine; for prod move to a Redis-backed set
    or a `run_manifests.in_flight` boolean column.
 
-7. **Worker process** (`web/app.py:_dispatch_session`). BackgroundTasks
+6. **Worker process** (`web/app.py:_dispatch_session`). BackgroundTasks
    on the threadpool is fine for single-tenant demo; concurrent demos
    queue serially and could exhaust the threadpool. The architecture
    originally scoped a separate `agentforge-redteam-worker.service`
    that polls `run_manifests` for new rows — never built. Either build
    it or commit to BackgroundTasks + bump uvicorn `--limit-concurrency`.
 
-8. **Multi-turn attacks not implemented.** State and attack schema
-   model a single `payload` (`state.py:49`, `attack_library.py:23`),
-   not a turn sequence. THREAT_MODEL.md and ARCHITECTURE.md describe
-   multi-turn capability that the code doesn't actually have.
-   Architectural change (~half day): extend `AttackRecord` to a
-   sequence of turns, update Red Team and Judge to handle.
-
-9. **Legacy stub graph.** `src/agentforge_redteam/graph.py`
+7. **Legacy stub graph.** `src/agentforge_redteam/graph.py`
    `compile_graph()` still returns stubs. Production uses
    `graph_factory.build_production_graph`, but a reviewer importing
    `compile_graph()` gets the fake path. Either delete `graph.py`
@@ -198,11 +218,39 @@ section lists what's still open.
     To fix: pad those system prompts past 2048 tok with useful
     context (similar to Judge's rubric inlining).
 
-### Closed since last update
+### Closed since last update (2026-05-13/14 — audit response)
 
-The following items from the previous version of this list have
-been resolved. Full bug/impact/resolution in `docs/BUG_LEDGER.md`:
+The following items from earlier versions of this list have been
+resolved. Full bug/impact/resolution in `docs/BUG_LEDGER.md`:
 
+- ~~`Cost cap leakage`~~ — fixed in commit `d73f2bc` (doc agent
+  cents/dollars + 5¢ doc-agent reserve in budget gate). Boundary
+  unit test in commit `9215f1a` pins the reserve at the exact
+  boundary. Verified live in session `86d8bace` (25¢ cap → $0.18
+  actual).
+- ~~`--categories flag captured but unused`~~ — wired through
+  end-to-end in commit `a6be982` (orchestrator filter +
+  graph_factory plumb + session_runner forward). Verified live
+  in sessions `b1a35acc`, `f4bdbf6c`, `a763e694` (coverage_matrix
+  shows only the requested categories ran).
+- ~~`Multi-turn attacks not implemented`~~ — adaptive multi-turn
+  with embedded conversation context shipped in commit `71074ba`,
+  verified live in session `b1a35acc` (4 multi_turn_next calls,
+  2 attacks with "Previously in this conversation:" prefix in
+  attacks.payload). Full transcripts in
+  `docs/EVIDENCE/2026-05-13-session-b1a35acc/multi_turn_transcripts.json`.
+- ~~`Categories 4/5/6 not represented`~~ — 3 new rubrics + 9 new
+  seeds in commit `fc354f6`; 30 new judge ground-truth cases (10
+  per stretch) in commit `9215f1a`. Total: 6 rubrics, 27 seeds,
+  60 ground-truth cases.
+- ~~`Regression replay broken (FK errors, drift warnings)`~~ —
+  fixed in commit `a6be982` (migration 0004 drops the FK,
+  rubric_sha re-stamp on existing cases). Replay artifact captured
+  in `docs/EVIDENCE/regression_replay/`.
+- ~~`Harness records rubric_sha but doesn't load historical bytes`~~
+  — fixed in commit `7689883` (SHA-keyed rubric cache module +
+  harness wiring). Cache-hit unit test pins the new path; existing
+  cache backfilled for the 6 promoted cases.
 - ~~`OpenAI mutation cost shows $0`~~ — fixed in commit `59f93cb`,
   verified showing 6¢ in session `ebd35d75`.
 - ~~`Anthropic prompt caching deployed but inactive`~~ — fixed in
@@ -219,16 +267,14 @@ These are the things only an operator can do. Everything else
 remaining is described in "Known debt" above.
 
 - **Demo video + social post** (Task #50) — operator-led, ~30 min
-  recording + edit, plus posting. Suggested script: open
-  `https://104-248-232-22.sslip.io/ui/`, kick off a session via the
-  SPA, show the live-activity card updating, drill into a finding
-  detail, show the kill switch, mention the regression-corpus
-  replay path (`agentforge-redteam regress`). Three live evidence
-  packages already document the underlying functionality.
+  recording + edit, plus posting. Detailed script:
+  [`docs/DEMO_SCRIPT.md`](DEMO_SCRIPT.md) — walks through every
+  reviewer concern in 4-5 minutes.
 - **Submit the gradebook entry** — point at the deployed UI URL,
   the GitLab repo, `docs/EVIDENCE/`, `docs/BUG_LEDGER.md`, and the
-  6 polished/promoted findings. README's "MVP Status" section
-  already lists the right links.
+  6 polished/promoted findings. README's "MVP Status" + "Verifying
+  from a fresh checkout" sections give graders everything they
+  need to verify claims.
 
 The earlier Task #59 ("write up findings from the demo run") is
 covered by `docs/EVIDENCE/` (5 sessions, 9 findings, 6 promoted
@@ -262,12 +308,15 @@ regression cases). Task #62 (TLS) shipped previously.
 
 ## Quick wins for the next 30 minutes (if that's all the time we have)
 
-1. Fix #5 (`--categories` scoping) — wire the captured arg through
-   to the orchestrator. Operator can finally scope a session.
-2. Fix #9 (legacy stub graph) — delete or re-export. Removes a
-   misleading import path for reviewers.
-3. Fix #1 (Doc Agent persistence ordering) — INSERT-then-update.
-   Removes a real-but-rare data-loss path.
+1. Fix #7 (legacy stub graph) — delete `src/agentforge_redteam/graph.py`
+   or have it re-export `build_production_graph`. Removes a
+   misleading import path for reviewers. ~15 min.
+2. Fix #1 (Doc Agent persistence ordering) — INSERT-then-update.
+   Removes a real-but-rare data-loss path. ~30 min.
+3. Fix #2 (canary modulo bug) — one-liner +
+   `canary_every_n_campaigns: 10` policy bump. Then drift detection
+   actually runs. ~15 min code; ground-truth re-baselining is the
+   medium-effort follow-up.
 
 All three are isolated, well-tested, and add real robustness. None
 are required to ship final, but each closes a sharp edge.
