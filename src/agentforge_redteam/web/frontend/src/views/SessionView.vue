@@ -1,22 +1,22 @@
 <script setup>
 import { ref, computed } from "vue";
 import { RouterLink } from "vue-router";
-import { api, apiPost, sessionFlash, usePolledResource } from "../composables/api.js";
+import {
+    api,
+    apiPost,
+    categorySelections,
+    sessionFlash,
+    usePolledResource,
+} from "../composables/api.js";
 
 const target = ref("droplet_prod");
 const costCap = ref(25);
-// All 6 threat-model categories (THREAT_MODEL.md Table 1). MVP defaults
-// on; stretch (state-corruption / dos-cost-amplification / identity-role-
-// exploitation) defaults off so a default 25¢-cap session focuses on
-// finding-rich MVP categories. Operator can flip stretch on per session.
-const categories = ref({
-    "prompt-injection-indirect": true,
-    "data-exfiltration": true,
-    "tool-misuse": true,
-    "state-corruption": false,
-    "dos-cost-amplification": false,
-    "identity-role-exploitation": false,
-});
+// All 6 threat-model categories (THREAT_MODEL.md Table 1). The ref lives
+// at module scope (composables/api.js) so the operator's checkbox
+// selections survive navigating away from SessionView and back —
+// SessionView is unmounted by Vue Router on navigation, and a
+// setup-local ref would reinitialize to defaults on remount.
+const categories = categorySelections;
 const submitting = ref(false);
 // `flash` is the module-level shared ref so the "Session started: …"
 // banner survives navigation away from this view and back. The

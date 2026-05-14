@@ -21,6 +21,28 @@ import { ref, onMounted, onUnmounted } from "vue";
  */
 export const sessionFlash = ref(null);
 
+/**
+ * Module-level shared ref for the SessionView's category-checkbox state.
+ * Same lifetime story as `sessionFlash`: lives at module scope so the
+ * operator's selections survive a navigation away and back. Otherwise
+ * Vue Router unmounts SessionView, the setup-local ref is GC'd, and
+ * re-mounting reinitializes to defaults — so checking a stretch
+ * category, navigating to COVERAGE to verify, then coming back, would
+ * silently reset the operator's pick. Reactive Vue dict; mutate
+ * `categorySelections.value['key'] = bool` to flip a checkbox.
+ *
+ * Defaults: MVP categories on, stretch off. Operator changes persist
+ * for the life of the SPA tab.
+ */
+export const categorySelections = ref({
+    "prompt-injection-indirect": true,
+    "data-exfiltration": true,
+    "tool-misuse": true,
+    "state-corruption": false,
+    "dos-cost-amplification": false,
+    "identity-role-exploitation": false,
+});
+
 export async function api(path, init = {}) {
     const resp = await fetch(path, {
         credentials: "same-origin",
