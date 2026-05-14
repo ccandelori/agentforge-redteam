@@ -157,22 +157,24 @@ def test_load_cases_empty_dir_returns_empty_list(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. load_cases — real ground-truth root has 30 cases (10 per category)
+# 2. load_cases — real ground-truth root has ≥10 cases per MVP category
 # ---------------------------------------------------------------------------
 
 
 def test_load_cases_real_root_loads_committed_corpus() -> None:
+    """Each MVP category has at least 10 hand-authored ground-truth cases.
+    Stretch categories (state-corruption / dos-cost-amplification /
+    identity-role-exploitation) MAY have additional cases; assertions use
+    >= so adding stretch cases doesn't break this test."""
     cases = load_cases(REAL_GROUND_TRUTH_ROOT)
-    assert len(cases) == 30
-    # The committed corpus is three categories x ten cases each.
+    assert len(cases) >= 30, f"expected ≥30 ground-truth cases, found {len(cases)}"
     by_cat: dict[str, int] = {}
     for case in cases:
         by_cat[case.category] = by_cat.get(case.category, 0) + 1
-    assert by_cat == {
-        "data-exfiltration": 10,
-        "prompt-injection-indirect": 10,
-        "tool-misuse": 10,
-    }
+    for mvp_cat in ("data-exfiltration", "prompt-injection-indirect", "tool-misuse"):
+        assert by_cat.get(mvp_cat, 0) >= 10, (
+            f"MVP category {mvp_cat!r} has {by_cat.get(mvp_cat, 0)} cases, expected at least 10"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +184,7 @@ def test_load_cases_real_root_loads_committed_corpus() -> None:
 
 def test_load_cases_category_filter_restricts_walk() -> None:
     cases = load_cases(REAL_GROUND_TRUTH_ROOT, categories=("data-exfiltration",))
-    assert len(cases) == 10
+    assert len(cases) >= 10, f"expected ≥10 data-exfiltration cases, found {len(cases)}"
     assert {c.category for c in cases} == {"data-exfiltration"}
 
 
