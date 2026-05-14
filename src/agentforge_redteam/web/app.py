@@ -71,7 +71,11 @@ from agentforge_redteam.web.schemas import (
     HaltResponse,
     QueueEntryResponse,
     QueueResponse,
+    RegressionListResponse,
+    RegressionRunSummary,
     RejectRequest,
+    SessionListEntry,
+    SessionListResponse,
     SessionStatusResponse,
     StartSessionRequest,
     StartSessionResponse,
@@ -561,6 +565,116 @@ def get_session(
         halt_reason=manifest[1],
         started_at=started_at,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase B: historical sessions list
+# ---------------------------------------------------------------------------
+
+
+@app.get("/sessions", response_model=SessionListResponse)
+def list_sessions(op: OperatorDep, engine: EngineDep) -> SessionListResponse:
+    """Return every row in ``run_manifests`` joined with cost + campaign aggregates.
+
+    Newest-first. Used by the SPA's Sessions page (Phase B inspectability).
+    Joins agent_steps for SUM(cost_cents) and DISTINCT campaign_id count from
+    attacks. NULL halt_reason / ended_at means in-flight.
+    """
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(
+                text(
+                    """
+                SELECT
+                    rm.session_id,
+                    rm.created_at,
+                    rm.ended_at,
+                    rm.halt_reason,
+                    rm.cost_cap_cents,
+                    COALESCE((
+                        SELECT SUM(cost_cents)
+                        FROM agent_steps
+                        WHERE session_id = rm.session_id
+                    ), 0) AS cost_so_far_cents,
+                    COALESCE((
+                        SELECT COUNT(DISTINCT a.campaign_id)
+                        FROM attacks a
+                        JOIN agent_steps s ON s.session_id = rm.session_id
+                        WHERE 1=1
+                    ), 0) AS campaigns_run
+                FROM run_manifests rm
+                ORDER BY rm.created_at DESC
+                """
+                )
+            )
+            .mappings()
+            .all()
+        )
+
+    return SessionListResponse(
+        sessions=[
+            SessionListEntry(
+                session_id=r["session_id"],
+                started_at=_ensure_utc(r["created_at"]),
+                ended_at=_maybe_utc(r["ended_at"]),
+                halt_reason=r["halt_reason"],
+                cost_cap_cents=int(r["cost_cap_cents"]),
+                cost_so_far_cents=int(r["cost_so_far_cents"] or 0),
+                campaigns_run=int(r["campaigns_run"] or 0),
+            )
+            for r in rows
+        ]
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase B: regression replay history
+# ---------------------------------------------------------------------------
+
+
+@app.get("/regressions", response_model=RegressionListResponse)
+def list_regressions(op: OperatorDep, engine: EngineDep) -> RegressionListResponse:
+    """Return every row in ``regression_runs``, newest-first.
+
+    Each row is one replay of a promoted finding against a (potentially new)
+    target_sha. ``verdict_comparison`` is a JSON blob — we extract the
+    ``status`` field for the table view; full blob ships in ``raw`` for
+    drill-down. Used by the SPA's Regressions page (Phase B inspectability).
+    """
+    with engine.connect() as conn:
+        rows = (
+            conn.execute(
+                text(
+                    "SELECT run_id, finding_id, target_sha, verdict_comparison, "
+                    "created_at FROM regression_runs ORDER BY created_at DESC"
+                )
+            )
+            .mappings()
+            .all()
+        )
+
+    summaries: list[RegressionRunSummary] = []
+    for r in rows:
+        raw = r["verdict_comparison"]
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except json.JSONDecodeError:
+                raw = {}
+        if not isinstance(raw, dict):
+            raw = {}
+        summaries.append(
+            RegressionRunSummary(
+                run_id=r["run_id"],
+                finding_id=r["finding_id"],
+                target_sha=r["target_sha"],
+                status=str(raw.get("status", "unknown")),
+                created_at=_ensure_utc(r["created_at"]),
+                raw=raw,
+            )
+        )
+
+    return RegressionListResponse(runs=summaries)
 
 
 # ---------------------------------------------------------------------------

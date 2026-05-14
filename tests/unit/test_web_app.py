@@ -572,6 +572,155 @@ def test_get_session_returns_persisted_halt_reason(
 
 
 # ---------------------------------------------------------------------------
+# Phase B: GET /sessions (historical list) + GET /regressions
+# ---------------------------------------------------------------------------
+
+
+def test_list_sessions_empty(client: TestClient) -> None:
+    resp = client.get("/sessions")
+    assert resp.status_code == 200
+    assert resp.json() == {"sessions": []}
+
+
+def test_list_sessions_returns_newest_first(client: TestClient, migrated_engine: Engine) -> None:
+    """The Sessions page wants newest-first ordering. Two manifests inserted
+    in known order; oldest must NOT be at the top."""
+    import time
+
+    sid_old = str(uuid.uuid4())
+    _insert_manifest_row(migrated_engine, sid_old)
+    time.sleep(0.05)  # ensure created_at differs at the SQLite second-resolution edge
+    sid_new = str(uuid.uuid4())
+    _insert_manifest_row(migrated_engine, sid_new)
+    # Force ordering using a deterministic UPDATE on created_at since SQLite's
+    # CURRENT_TIMESTAMP is second-resolution and the two inserts may collide.
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "UPDATE run_manifests SET created_at = '2026-05-13 10:00:00' "
+                "WHERE session_id = :sid"
+            ),
+            {"sid": sid_old},
+        )
+        conn.execute(
+            sa.text(
+                "UPDATE run_manifests SET created_at = '2026-05-14 10:00:00' "
+                "WHERE session_id = :sid"
+            ),
+            {"sid": sid_new},
+        )
+
+    resp = client.get("/sessions")
+    assert resp.status_code == 200
+    body = resp.json()
+    sessions = body["sessions"]
+    assert len(sessions) == 2
+    assert sessions[0]["session_id"] == sid_new
+    assert sessions[1]["session_id"] == sid_old
+
+
+def test_list_sessions_carries_halt_reason_and_cost(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """Phase B adds halt_reason + ended_at + aggregated cost. Confirm all
+    three flow through GET /sessions for a terminal session."""
+    sid = str(uuid.uuid4())
+    _insert_manifest_row(migrated_engine, sid)
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "UPDATE run_manifests "
+                "SET halt_reason = 'no_progress', "
+                "    ended_at = '2026-05-14 11:00:00' "
+                "WHERE session_id = :sid"
+            ),
+            {"sid": sid},
+        )
+        conn.execute(
+            sa.text(
+                "INSERT INTO agent_steps "
+                "(step_id, agent, tool, args, result, cost_cents, latency_ms, session_id) "
+                "VALUES (:step, 'judge', 'evaluate_check', '{}', '{}', 17, 100, :sid)"
+            ),
+            {"step": str(uuid.uuid4()), "sid": sid},
+        )
+
+    resp = client.get("/sessions")
+    body = resp.json()
+    entry = next(e for e in body["sessions"] if e["session_id"] == sid)
+    assert entry["halt_reason"] == "no_progress"
+    assert entry["ended_at"] is not None
+    assert entry["cost_so_far_cents"] == 17
+    assert entry["cost_cap_cents"] == 100  # _insert_manifest_row default
+
+
+def test_list_regressions_empty(client: TestClient) -> None:
+    resp = client.get("/regressions")
+    assert resp.status_code == 200
+    assert resp.json() == {"runs": []}
+
+
+def test_list_regressions_extracts_status_from_verdict_comparison(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """Each regression_runs row carries a verdict_comparison JSON blob. The
+    Sessions page wants the .status field surfaced; the full blob ships in
+    .raw for drill-down."""
+    finding_id = uuid.uuid4()
+    # Insert a finding to satisfy the FK constraint
+    attack_id = uuid.uuid4()
+    verdict_id = uuid.uuid4()
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "INSERT INTO attacks (attack_id, campaign_id, payload, target_response, "
+                "target_sha, status_code, latency_ms) VALUES "
+                "(:a, :c, 'p', 'r', 'sha', 200, 0)"
+            ),
+            {"a": str(attack_id), "c": str(uuid.uuid4())},
+        )
+        conn.execute(
+            sa.text(
+                "INSERT INTO verdicts (verdict_id, attack_id, verdict, confidence, "
+                "evidence_refs, rubric_sha, model_version, prompt_sha) VALUES "
+                "(:v, :a, 'pass', 0.7, '[]', 'r', 'm', 'p')"
+            ),
+            {"v": str(verdict_id), "a": str(attack_id)},
+        )
+        conn.execute(
+            sa.text(
+                "INSERT INTO findings (finding_id, severity, attack_id, verdict_id, "
+                "gitlab_issue_id, sanitized_evidence) VALUES "
+                "(:f, 'P3', :a, :v, NULL, '{}')"
+            ),
+            {"f": str(finding_id), "a": str(attack_id), "v": str(verdict_id)},
+        )
+        run_id = uuid.uuid4()
+        conn.execute(
+            sa.text(
+                "INSERT INTO regression_runs "
+                "(run_id, finding_id, target_sha, verdict_comparison) VALUES "
+                "(:r, :f, 'new-sha-abc', :vc)"
+            ),
+            {
+                "r": str(run_id),
+                "f": str(finding_id),
+                "vc": json.dumps(
+                    {"status": "held", "expected_verdict": "pass", "actual_verdict": "pass"}
+                ),
+            },
+        )
+
+    resp = client.get("/regressions")
+    assert resp.status_code == 200
+    runs = resp.json()["runs"]
+    assert len(runs) == 1
+    assert runs[0]["status"] == "held"
+    assert runs[0]["target_sha"] == "new-sha-abc"
+    assert runs[0]["raw"]["expected_verdict"] == "pass"
+
+
+# ---------------------------------------------------------------------------
 # Queue
 # ---------------------------------------------------------------------------
 

@@ -19,10 +19,12 @@ const router = createRouter({
     history: createWebHistory(),
     routes: [
         { path: "/ui",                 name: "session",        component: () => import("./views/SessionView.vue") },
+        { path: "/ui/sessions",        name: "sessions",       component: () => import("./views/SessionsView.vue") },
         { path: "/ui/coverage",        name: "coverage",       component: () => import("./views/CoverageView.vue") },
         { path: "/ui/findings",        name: "findings",       component: () => import("./views/FindingsView.vue") },
         { path: "/ui/findings/:id",    name: "finding-detail", component: () => import("./views/FindingDetailView.vue"), props: true },
         { path: "/ui/queue",           name: "queue",          component: () => import("./views/QueueView.vue") },
+        { path: "/ui/regressions",     name: "regressions",    component: () => import("./views/RegressionsView.vue") },
         { path: "/ui/halt",            name: "halt",           component: () => import("./views/HaltView.vue") },
     ],
 });

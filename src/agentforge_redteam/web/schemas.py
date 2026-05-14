@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -224,3 +224,54 @@ class RejectRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
     category: str | None = None
     write_ground_truth: bool = True
+
+
+# ---------------------------------------------------------------------------
+# Phase B: inspectability — historical sessions + regression replay results
+# ---------------------------------------------------------------------------
+
+
+class SessionListEntry(BaseModel):
+    """One row in ``GET /sessions`` (historical session list).
+
+    Joins ``run_manifests`` with a SUM over ``agent_steps.cost_cents``.
+    ``halt_reason`` and ``ended_at`` come from the columns added in
+    migration 0003 — both NULL while the session is in flight.
+    """
+
+    session_id: str
+    started_at: datetime
+    ended_at: datetime | None
+    halt_reason: str | None
+    cost_cap_cents: int
+    cost_so_far_cents: int
+    campaigns_run: int
+
+
+class SessionListResponse(BaseModel):
+    """Body for ``GET /sessions``. Newest-first ordering."""
+
+    sessions: list[SessionListEntry]
+
+
+class RegressionRunSummary(BaseModel):
+    """One row in ``GET /regressions``.
+
+    ``verdict_comparison`` is the JSON blob the harness emits per replay
+    (held / regressed / weakly_passing / inconclusive plus the verdict
+    delta). We pull just the status string out for the table; full
+    ``verdict_comparison`` is in ``raw`` for drill-down.
+    """
+
+    run_id: UUID
+    finding_id: UUID
+    target_sha: str
+    status: str
+    created_at: datetime
+    raw: dict[str, Any]
+
+
+class RegressionListResponse(BaseModel):
+    """Body for ``GET /regressions``. Newest-first ordering."""
+
+    runs: list[RegressionRunSummary]
