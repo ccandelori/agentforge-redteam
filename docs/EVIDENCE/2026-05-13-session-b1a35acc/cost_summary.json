@@ -1,0 +1,28 @@
+{
+  "session_id": "b1a35acc-45bd-40ca-b61b-3ffeb0f92242",
+  "platform_reported": {
+    "total_cents": 29,
+    "by_agent": [
+      {
+        "agent": "judge",
+        "calls": 19,
+        "cost_cents": 20,
+        "avg_latency_ms": 3208.0
+      },
+      {
+        "agent": "orchestrator",
+        "calls": 5,
+        "cost_cents": 5,
+        "avg_latency_ms": 1159.0
+      },
+      {
+        "agent": "red_team",
+        "calls": 13,
+        "cost_cents": 4,
+        "avg_latency_ms": 4611.0
+      }
+    ]
+  },
+  "multi_turn_calls": 4,
+  "multi_turn_attack_count": 2
+}

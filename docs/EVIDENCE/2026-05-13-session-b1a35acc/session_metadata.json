@@ -1,0 +1,33 @@
+{
+  "session_id": "b1a35acc-45bd-40ca-b61b-3ffeb0f92242",
+  "started_at": "2026-05-14 00:22:03",
+  "ended_at": "2026-05-14 00:24:24.027234+00:00",
+  "halt_reason": "no_progress",
+  "cost_cap_cents_requested": 50,
+  "total_cost_cents_actual_reported": 29,
+  "total_cost_usd_actual_reported": 0.29,
+  "agent_steps_total": 37,
+  "campaigns_run": 14,
+  "categories_in_coverage_matrix": [
+    "data-exfiltration",
+    "dos-cost-amplification",
+    "identity-role-exploitation",
+    "prompt-injection-indirect",
+    "state-corruption",
+    "tool-misuse"
+  ],
+  "deployed_platform_url": "https://104-248-232-22.sslip.io/ui/",
+  "platform_commit_at_run": "fc354f6 (Cat 4/5/6 rubrics + 9 new seeds + multi-turn unreachability fix)",
+  "verifies_fixes": [
+    "71074ba multi-turn loop \u2014 VERIFIED: 4 multi_turn_next agent_steps in this session; 2 attacks with 'Previously in this conversation' prefix in their payload (proves the conversation-context embedding hit the target).",
+    "fc354f6 multi-turn unreachability fix \u2014 VERIFIED: multi-turn seeds were unreachable in session a3e37081 (0 multi_turn_next calls). Now reachable via the *_multi_turn sub_attack rename.",
+    "fc354f6 Categories 4/5/6 representation \u2014 VERIFIED: coverage_matrix on the deployed platform now tracks all 6 categories: ['data-exfiltration', 'dos-cost-amplification', 'identity-role-exploitation', 'prompt-injection-indirect', 'state-corruption', 'tool-misuse'].",
+    "d73f2bc cost cap leakage fix \u2014 VERIFIED: 50\u00a2 cap requested, /bin/zsh.29 actual (well under cap, halted naturally first)."
+  ],
+  "db_snapshot": {
+    "filename": "platform_droplet_20260514T002535Z.db",
+    "sha256": "f47e5091b92d88d840e2afa5757d70298965de9f01551058eab158b5c623875f",
+    "size_bytes": 3256320
+  },
+  "git_sha_at_capture": "fc354f6160ca7b5425238025336df97a064e2a0b"
+}
