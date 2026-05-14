@@ -1,0 +1,30 @@
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001, initial schema
+INFO  [alembic.runtime.migration] Running upgrade 0001 -> 0002, add prompt_sha column to verdicts
+INFO  [alembic.runtime.migration] Running upgrade 0002 -> 0003, add halt_reason + ended_at columns to run_manifests
+INFO  [alembic.runtime.migration] Running upgrade 0003 -> 0004, drop FK constraint on regression_runs.finding_id
+
+=== regress output ===
+2026-05-13 21:18:07 [info     ] regression.session_start       case_count=6 new_target_sha=audit-check root=evals/regressions
+2026-05-13 21:18:07 [info     ] regression.replayed            confidence_delta=-0.19999999999999996 finding_id=4181c078-4842-4a2d-948b-7a7bb7ac709d new_verdict=fail old_verdict=pass run_id=f3e7c86e-4c68-4d3a-a6c6-f17dd1f915a8 status=held
+2026-05-13 21:18:07 [info     ] regression.replayed            confidence_delta=-0.19999999999999996 finding_id=6511a75f-2c86-4d8c-b62e-74b474dcdad5 new_verdict=fail old_verdict=pass run_id=dec0c1d2-efa3-44c9-a8f7-15542dda975d status=held
+2026-05-13 21:18:07 [info     ] regression.replayed            confidence_delta=-0.5 finding_id=88e13da9-5901-4147-b815-07f190c3fe69 new_verdict=fail old_verdict=pass run_id=48e0f003-b732-424f-b9c5-e26fca89d527 status=held
+2026-05-13 21:18:07 [info     ] regression.replayed            confidence_delta=-0.5 finding_id=b08513e4-40cf-4170-a550-75b5a1d241ca new_verdict=fail old_verdict=pass run_id=18bc01b0-7cc7-4d9a-a8ed-2d216719dac3 status=held
+2026-05-13 21:18:07 [info     ] regression.replayed            confidence_delta=-0.19999999999999996 finding_id=dc448e8d-34c9-48bd-91df-a45fb0e22223 new_verdict=fail old_verdict=pass run_id=5c98cdff-7be8-45a6-b8c2-01883093a37f status=held
+2026-05-13 21:18:07 [info     ] regression.replayed            confidence_delta=-0.19999999999999996 finding_id=e6d02f47-e9d2-4a18-83b0-d562eb94eb06 new_verdict=fail old_verdict=pass run_id=df7129f3-b350-4f37-813e-42fb8ab66ac0 status=held
+2026-05-13 21:18:07 [info     ] regression.session_complete    held=6 inconclusive=0 new_target_sha=audit-check regressed=0 total=6 weakly_passing=0
+Regression session against target_sha=audit-check
+  clients: NOOP (set ANTHROPIC_API_KEY for real replay)
+  target_url: http://localhost:8000
+  total: 6
+  held: 6
+  regressed: 0
+  weakly_passing: 0
+  inconclusive: 0
+
+=== regression_runs rows recorded ===
+f3e7c86e-4c68-4d3a-a6c6-f17dd1f915a8|4181c078-4842-4a2d-948b-7a7bb7ac709d|audit-check|held
+dec0c1d2-efa3-44c9-a8f7-15542dda975d|6511a75f-2c86-4d8c-b62e-74b474dcdad5|audit-check|held
+48e0f003-b732-424f-b9c5-e26fca89d527|88e13da9-5901-4147-b815-07f190c3fe69|audit-check|held
+18bc01b0-7cc7-4d9a-a8ed-2d216719dac3|b08513e4-40cf-4170-a550-75b5a1d241ca|audit-check|held
+5c98cdff-7be8-45a6-b8c2-01883093a37f|dc448e8d-34c9-48bd-91df-a45fb0e22223|audit-check|held
+df7129f3-b350-4f37-813e-42fb8ab66ac0|e6d02f47-e9d2-4a18-83b0-d562eb94eb06|audit-check|held

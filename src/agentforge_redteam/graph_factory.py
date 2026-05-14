@@ -577,6 +577,7 @@ def build_production_graph(
     http_client: HTTPTargetClientLike | None = None,
     target_alias: str = "droplet_prod",
     policy_path: Path | str = Path("orchestrator_policy.yaml"),
+    allowed_categories: tuple[str, ...] | None = None,
 ) -> tuple[Any, ProductionGraphConfig]:
     """Build and compile the production graph.
 
@@ -688,6 +689,7 @@ def build_production_graph(
             policy=policy,
             rng=rng_instance,
             langfuse=langfuse_client,
+            allowed_categories=allowed_categories,
         )
 
     async def _red_team_closure(state: PlatformState) -> PlatformState:

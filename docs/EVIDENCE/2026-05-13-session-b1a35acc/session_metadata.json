@@ -22,7 +22,7 @@
     "71074ba multi-turn loop \u2014 VERIFIED: 4 multi_turn_next agent_steps in this session; 2 attacks with 'Previously in this conversation' prefix in their payload (proves the conversation-context embedding hit the target).",
     "fc354f6 multi-turn unreachability fix \u2014 VERIFIED: multi-turn seeds were unreachable in session a3e37081 (0 multi_turn_next calls). Now reachable via the *_multi_turn sub_attack rename.",
     "fc354f6 Categories 4/5/6 representation \u2014 VERIFIED: coverage_matrix on the deployed platform now tracks all 6 categories: ['data-exfiltration', 'dos-cost-amplification', 'identity-role-exploitation', 'prompt-injection-indirect', 'state-corruption', 'tool-misuse'].",
-    "d73f2bc cost cap leakage fix \u2014 VERIFIED: 50\u00a2 cap requested, /bin/zsh.29 actual (well under cap, halted naturally first)."
+    "d73f2bc cost cap leakage fix \u2014 VERIFIED: 50\u00a2 cap requested, $0.29 actual (well under cap, halted naturally first)."
   ],
   "db_snapshot": {
     "filename": "platform_droplet_20260514T002535Z.db",

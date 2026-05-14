@@ -100,13 +100,23 @@ agentforge-redteam/
 └── pyproject.toml            # project + tooling config
 ```
 
-## MVP attack categories
+## Attack categories
 
-The three categories seeded in [`attack_library.json`](./attack_library.json):
+All 6 threat-model categories from [`THREAT_MODEL.md`](./THREAT_MODEL.md)
+are seeded in [`attack_library.json`](./attack_library.json) and have a
+rubric YAML under [`rubrics/`](./rubrics/). MVP categories (1–3) get
+≥6 seeds each; stretch categories (4–6) get ≥3 each. 5 of the 27 seeds
+are multi-turn (`max_turns ≥ 2`).
 
-- **prompt-injection-indirect** — marker tokens, citation fabrication, unauthorized actions
+**MVP** (the bulk of seed coverage):
+- **prompt-injection-indirect** — marker tokens, citation fabrication, unauthorized actions, system-prompt revelation
 - **data-exfiltration** — cross-patient PHI, minimum-necessary violations, trace leakage
-- **tool-misuse** — unauthorized tool invocation, parameter tampering, recursive loops
+- **tool-misuse** — unauthorized tool invocation, parameter tampering, recursive loops, audit-log evasion
+
+**Stretch** (minimum representation, room to grow):
+- **state-corruption** — fake-history injection, instruction persistence, confirmation-token forgery
+- **dos-cost-amplification** — recursive tool invocation, unbounded response inflation, expensive query amplification
+- **identity-role-exploitation** — attending-override assertion, persona flip, break-glass invocation
 
 ## Documentation
 
@@ -128,11 +138,12 @@ The three categories seeded in [`attack_library.json`](./attack_library.json):
 - **Hard-gate docs**: ARCHITECTURE.md, THREAT_MODEL.md, USERS.md, DEFENSE.md, DIAGRAMS.md, presearch.md (all committed)
 - **Schema**: SQLite tables under Alembic management; migrations applied
 - **Agents**: 4 LangGraph nodes (Red Team / Judge / Orchestrator / Documentation) wired with Protocol-typed clients via `graph_factory.build_production_graph`
-- **Rubrics**: 3 production rubric YAMLs (prompt-injection-indirect / data-exfiltration / tool-misuse) + 1 example fixture
-- **Attack library**: 16 hand-curated seed payloads (5 data-exfiltration / 5 indirect-prompt-injection / 6 tool-misuse)
-- **Ground truth**: 30 hand-authored Judge cases (10 per category)
-- **Findings filing path**: GitLab-or-local-file fallback — 3 polished reports already in `findings/*_polished.md`
-- **Test suite**: 642 unit + integration tests, mypy strict, ruff clean
+- **Rubrics**: **6** production rubric YAMLs covering all 6 threat-model categories + 1 example fixture
+- **Attack library**: **27** hand-curated seed payloads (6 prompt-injection-indirect / 6 data-exfiltration / 6 tool-misuse / 3 state-corruption / 3 dos-cost-amplification / 3 identity-role-exploitation), of which 5 are multi-turn (`max_turns: 3`)
+- **Ground truth**: 30 hand-authored Judge cases (10 per MVP category; stretch-category ground truth pending)
+- **Regression corpus**: **6** promoted cases in [`evals/regressions/`](./evals/regressions/), replayable end-to-end via `agentforge-redteam regress` (no FK errors, see `docs/EVIDENCE/regression_replay/` for a captured run)
+- **Findings filing path**: GitLab-or-local-file fallback — 3 polished reports in `findings/*_polished.md`
+- **Test suite**: **661** unit + integration tests, mypy strict, ruff clean
 
 **What's next**: see [`docs/NEXT-SESSION.md`](./docs/NEXT-SESSION.md) for the live ops
 runbook (deploy, smoke, trigger sessions, watch counters, tail logs) and the

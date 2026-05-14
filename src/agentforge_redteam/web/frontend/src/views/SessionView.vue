@@ -5,10 +5,17 @@ import { api, apiPost, sessionFlash, usePolledResource } from "../composables/ap
 
 const target = ref("droplet_prod");
 const costCap = ref(25);
+// All 6 threat-model categories (THREAT_MODEL.md Table 1). MVP defaults
+// on; stretch (state-corruption / dos-cost-amplification / identity-role-
+// exploitation) defaults off so a default 25¢-cap session focuses on
+// finding-rich MVP categories. Operator can flip stretch on per session.
 const categories = ref({
     "prompt-injection-indirect": true,
     "data-exfiltration": true,
     "tool-misuse": true,
+    "state-corruption": false,
+    "dos-cost-amplification": false,
+    "identity-role-exploitation": false,
 });
 const submitting = ref(false);
 // `flash` is the module-level shared ref so the "Session started: …"

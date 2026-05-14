@@ -433,6 +433,7 @@ async def orchestrator_node(
     rubrics_dir: Path | str = DEFAULT_RUBRICS_DIR,
     prompts_dir: Path = PROMPTS_DIR,
     current_target_sha: str | None = None,
+    allowed_categories: tuple[str, ...] | None = None,
 ) -> PlatformState:
     """Pick the next campaign, or halt.
 
@@ -518,8 +519,15 @@ async def orchestrator_node(
     except FileNotFoundError:
         rubrics = {}
 
+    # Honor the operator's --categories scope when provided. Empty tuple
+    # / None = all categories (backward compat). Unknown categories are
+    # silently ignored — the operator may have misspelled, but better to
+    # halt loudly via HALT_NO_CANDIDATES than to crash here.
+    allowed_set = set(allowed_categories) if allowed_categories else None
     candidates: list[tuple[str, str]] = []
     for category in sorted(rubrics.keys()):
+        if allowed_set is not None and category not in allowed_set:
+            continue
         for sub_attack in rubrics[category].sub_attacks:
             candidates.append((category, sub_attack))
 

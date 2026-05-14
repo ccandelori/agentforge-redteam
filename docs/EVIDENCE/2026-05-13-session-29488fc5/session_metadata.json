@@ -3,7 +3,7 @@
   "cost_cap_cents_requested": 75,
   "started_at": "2026-05-13 18:56:01",
   "halted_at": "2026-05-13T19:12:22Z",
-  "halt_reason": "manual /halt \u2014 orchestrator wedged at campaign 5; cost stuck at /bin/zsh.20; no log activity for 5+ min before halt",
+  "halt_reason": "manual /halt \u2014 orchestrator wedged at campaign 5; cost stuck at $0.20; no log activity for 5+ min before halt",
   "total_cost_cents_actual": 20,
   "total_cost_usd_actual": 0.2,
   "agent_steps_total": 26,

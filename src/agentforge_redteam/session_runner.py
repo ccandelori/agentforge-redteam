@@ -234,15 +234,16 @@ def run_session(
         The graph looped past its recursion limit before any halt rule
         fired. The caller (CLI) maps this to a distinct exit code.
     """
-    # TODO(category-filter): the orchestrator currently enumerates rubrics
-    # directly; this hint is captured for traceability but does not yet
-    # narrow the candidate set. Wire through when the orchestrator grows a
-    # category filter parameter.
+    # ``categories`` is forwarded into the orchestrator's candidate filter.
+    # Empty tuple = no filter (all rubric categories considered). Empty was
+    # previously the default behavior because the filter wasn't wired; it
+    # remains the default to preserve back-compat for callers that pass
+    # nothing or pass an empty tuple.
     _LOGGER.info(
         "starting session target=%s cost_cap_cents=%d categories=%s max_campaigns=%d",
         target_alias,
         cost_cap_cents,
-        ",".join(categories),
+        ",".join(categories) if categories else "(all)",
         max_campaigns,
     )
 
@@ -264,6 +265,7 @@ def run_session(
             http_client=http_client,
             target_alias=target_alias,
             policy_path=policy_path,
+            allowed_categories=tuple(categories) if categories else None,
         )
 
         initial = PlatformState(session_id=resolved_session_id)
