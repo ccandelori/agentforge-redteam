@@ -266,6 +266,7 @@ def run_session(
             target_alias=target_alias,
             policy_path=policy_path,
             allowed_categories=tuple(categories) if categories else None,
+            cost_cap_cents_override=cost_cap_cents,
         )
 
         initial = PlatformState(session_id=resolved_session_id)

@@ -578,6 +578,7 @@ def build_production_graph(
     target_alias: str = "droplet_prod",
     policy_path: Path | str = Path("orchestrator_policy.yaml"),
     allowed_categories: tuple[str, ...] | None = None,
+    cost_cap_cents_override: int | None = None,
 ) -> tuple[Any, ProductionGraphConfig]:
     """Build and compile the production graph.
 
@@ -665,6 +666,18 @@ def build_production_graph(
     # Load policy and target URL up front so misconfiguration raises before
     # we attempt graph compilation.
     policy = load_policy(policy_path)
+
+    # Operator-supplied per-session cap (from API ``cost_cap_cents`` /
+    # CLI ``--cost-cap-cents``) takes precedence over the policy YAML's
+    # max_session_cost_cents — the operator's intent for THIS session is
+    # the authoritative ceiling. The policy value remains a hard upper
+    # bound: ``min()`` ensures an operator can't bypass it by passing a
+    # huge cap. Without this override, the orchestrator's budget gate
+    # silently ignored the operator's cap and only enforced the policy's
+    # default ($10), letting an "8¢ session" run far past 8¢.
+    if cost_cap_cents_override is not None:
+        effective_cap = min(cost_cap_cents_override, policy.max_session_cost_cents)
+        policy = policy.model_copy(update={"max_session_cost_cents": effective_cap})
 
     targets = load_targets()
     if target_alias not in targets:

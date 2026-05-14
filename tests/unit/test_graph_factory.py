@@ -242,6 +242,44 @@ def test_invalid_target_alias_raises(engine: Engine) -> None:
         )
 
 
+def test_cost_cap_cents_override_lowers_policy_max_session(engine: Engine) -> None:
+    """Operator-supplied ``cost_cap_cents`` (e.g. via API or CLI) MUST
+    flow into ``policy.max_session_cost_cents`` so the orchestrator's
+    budget gate enforces it. Without this wiring, the operator's cap
+    was silently ignored and only the policy YAML's default ($10) was
+    enforced — observed live as an "8¢ session" running past 27¢.
+
+    Regression guard for the bug fixed alongside this commit.
+    """
+    _, config = build_production_graph(
+        env={},
+        engine=engine,
+        cost_cap_cents_override=8,
+    )
+    assert config.policy.max_session_cost_cents == 8
+
+
+def test_cost_cap_cents_override_capped_by_policy_ceiling(engine: Engine) -> None:
+    """An operator can't bypass the policy YAML's ceiling by passing a
+    huge cap. ``min(operator_cap, policy_cap)`` is the effective value."""
+    _, config = build_production_graph(
+        env={},
+        engine=engine,
+        cost_cap_cents_override=100_000,  # absurdly high
+    )
+    # Real policy YAML caps at 1000¢ ($10); the override does NOT raise it.
+    assert config.policy.max_session_cost_cents <= 1000
+
+
+def test_cost_cap_cents_override_none_preserves_policy_default(engine: Engine) -> None:
+    """When no operator override is supplied (None), the policy YAML's
+    ``max_session_cost_cents`` is used as-is. Backward-compat for
+    callers that don't know about the override kwarg."""
+    _, config = build_production_graph(env={}, engine=engine)
+    # Real policy ships at 1000¢; bare-call must not silently change that.
+    assert config.policy.max_session_cost_cents == 1000
+
+
 # ---------------------------------------------------------------------------
 # 6. Stub LLMs raise an actionable error when invoked.
 # ---------------------------------------------------------------------------
