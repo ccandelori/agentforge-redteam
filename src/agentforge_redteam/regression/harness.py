@@ -34,6 +34,7 @@ fast and free of LLM-shaped fixtures.
 from __future__ import annotations
 
 import json
+import tempfile
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -380,6 +381,42 @@ async def promote_finding_to_regression(
         promoted_at=datetime.now(UTC),
     )
     path = write_case(case, root)
+
+    # Cache the rubric YAML bytes by SHA so future replays can load the
+    # historical rubric exactly even if the on-disk YAML has since drifted.
+    # See ``regression/rubric_cache.py`` for the rationale.
+    if rubric_category:
+        try:
+            from agentforge_redteam.regression.rubric_cache import (
+                DEFAULT_CACHE_DIR,
+                cache_rubric_bytes,
+            )
+            from agentforge_redteam.rubrics.loader import DEFAULT_RUBRICS_DIR
+
+            rubric_path = Path(DEFAULT_RUBRICS_DIR) / f"{rubric_category}.yaml"
+            if rubric_path.is_file():
+                cached_sha = cache_rubric_bytes(rubric_path.read_bytes(), DEFAULT_CACHE_DIR)
+                if cached_sha != case.rubric_sha:
+                    # Promotion-time drift: the verdict was judged against an
+                    # earlier rubric than what's currently on disk. We still
+                    # cache the on-disk bytes (so future replays HAVE
+                    # something) but log the discrepancy loudly — the
+                    # operator should investigate why the verdict's
+                    # rubric_sha doesn't match the file the Judge would load
+                    # right now.
+                    logger.warning(
+                        "regression.promote_rubric_sha_mismatch",
+                        finding_id=str(finding_id),
+                        verdict_rubric_sha=case.rubric_sha,
+                        on_disk_rubric_sha=cached_sha,
+                    )
+        except Exception:
+            logger.exception(
+                "regression.promote_rubric_cache_failed",
+                finding_id=str(finding_id),
+                rubric_category=rubric_category,
+            )
+
     logger.info(
         "regression.promoted",
         finding_id=str(finding_id),
@@ -429,27 +466,71 @@ async def replay_regression_test(
        :func:`_classify_status`. Insert a row into ``regression_runs``.
     6. Return the :class:`RegressionResult` to the caller.
     """
-    # ---- 1. Rubric drift check. -----------------------------------------
+    # ---- 1. Rubric drift check + historical-bytes cache lookup. ----------
+    # Goal: replay against the rubric the Judge ACTUALLY USED at promotion
+    # time. If the on-disk SHA matches, easy — use the on-disk file.
+    # If it differs, look up the cache for the recorded SHA and materialize
+    # those historical bytes to a per-replay tmp dir, which we then pass to
+    # the Judge as ``rubrics_dir``. Closes the audit-flagged "drift warning
+    # then silently swap rubric" gap.
+    from agentforge_redteam.regression.rubric_cache import (
+        DEFAULT_CACHE_DIR,
+        load_cached_rubric,
+    )
+
     try:
         on_disk = load_rubric(test_case.rubric_category, rubrics_dir)
     except RubricNotFoundError:
         on_disk = None
 
+    effective_rubrics_dir: Path | str = rubrics_dir
+    _materialized_rubric_tmpdir: tempfile.TemporaryDirectory[str] | None = None
+
     if on_disk is None:
-        logger.warning(
-            "regression.rubric_missing",
-            rubric_category=test_case.rubric_category,
-            recorded_sha=test_case.rubric_sha,
-            finding_id=str(test_case.finding_id),
-        )
+        cached = load_cached_rubric(test_case.rubric_sha, DEFAULT_CACHE_DIR)
+        if cached is not None:
+            _materialized_rubric_tmpdir = tempfile.TemporaryDirectory(prefix="rubric_cache_")
+            tmp_path = Path(_materialized_rubric_tmpdir.name) / f"{test_case.rubric_category}.yaml"
+            tmp_path.write_text(cached.raw_text, encoding="utf-8")
+            effective_rubrics_dir = Path(_materialized_rubric_tmpdir.name)
+            logger.info(
+                "regression.rubric_loaded_from_cache",
+                rubric_category=test_case.rubric_category,
+                rubric_sha=test_case.rubric_sha,
+                finding_id=str(test_case.finding_id),
+            )
+        else:
+            logger.warning(
+                "regression.rubric_missing",
+                rubric_category=test_case.rubric_category,
+                recorded_sha=test_case.rubric_sha,
+                finding_id=str(test_case.finding_id),
+            )
     elif on_disk.sha != test_case.rubric_sha:
-        logger.warning(
-            "regression.rubric_drift",
-            rubric_category=test_case.rubric_category,
-            recorded_sha=test_case.rubric_sha,
-            on_disk_sha=on_disk.sha,
-            finding_id=str(test_case.finding_id),
-        )
+        cached = load_cached_rubric(test_case.rubric_sha, DEFAULT_CACHE_DIR)
+        if cached is not None:
+            _materialized_rubric_tmpdir = tempfile.TemporaryDirectory(prefix="rubric_cache_")
+            tmp_path = Path(_materialized_rubric_tmpdir.name) / f"{test_case.rubric_category}.yaml"
+            tmp_path.write_text(cached.raw_text, encoding="utf-8")
+            effective_rubrics_dir = Path(_materialized_rubric_tmpdir.name)
+            logger.info(
+                "regression.rubric_loaded_from_cache_after_drift",
+                rubric_category=test_case.rubric_category,
+                recorded_sha=test_case.rubric_sha,
+                on_disk_sha=on_disk.sha,
+                finding_id=str(test_case.finding_id),
+            )
+        else:
+            # Fall back to current behavior: warn drift, replay against
+            # current rubric. This is the legacy path; once cache coverage
+            # is universal it should never fire.
+            logger.warning(
+                "regression.rubric_drift",
+                rubric_category=test_case.rubric_category,
+                recorded_sha=test_case.rubric_sha,
+                on_disk_sha=on_disk.sha,
+                finding_id=str(test_case.finding_id),
+            )
 
     effective_session_id = session_id or f"regression-{test_case.finding_id}"
 
@@ -499,7 +580,7 @@ async def replay_regression_test(
         engine=engine,
         llm=llm_for_judge,
         langfuse=langfuse,
-        rubrics_dir=rubrics_dir,
+        rubrics_dir=effective_rubrics_dir,
     )
     if not judged.verdict_records:
         raise RuntimeError("judge_node returned a state with no verdict_records; cannot classify")
@@ -548,7 +629,7 @@ async def replay_regression_test(
         confidence_delta=confidence_delta,
     )
 
-    return RegressionResult(
+    result = RegressionResult(
         run_id=run_id,
         test_case_path=str(Path(root) / f"{test_case.finding_id}.json"),
         new_target_sha=new_target_sha,
@@ -560,3 +641,6 @@ async def replay_regression_test(
         confidence_delta=confidence_delta,
         notes=notes,
     )
+    if _materialized_rubric_tmpdir is not None:
+        _materialized_rubric_tmpdir.cleanup()
+    return result

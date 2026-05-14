@@ -700,7 +700,10 @@ async def test_replay_passes_rubric_category_to_judge(
 
 async def test_replay_warns_on_rubric_drift(engine: Engine, regressions_root: Path) -> None:
     # Seed a finding whose recorded rubric_sha intentionally does NOT match
-    # the real prompt-injection-indirect rubric on disk.
+    # the real prompt-injection-indirect rubric on disk AND has no cache
+    # entry — so the harness falls back to current-rubric replay with a
+    # drift warning. (The cache-hit path is covered by
+    # test_replay_loads_cached_rubric_after_drift below.)
     drift_sha = SHA_64_HEX_ALT
     finding_id, _aid, _vid = _seed_finding(
         engine,
@@ -734,6 +737,91 @@ async def test_replay_warns_on_rubric_drift(engine: Engine, regressions_root: Pa
     drift_events = [e for e in logs if e.get("event") == "regression.rubric_drift"]
     assert len(drift_events) == 1, f"expected 1 drift event, got {logs!r}"
     assert drift_events[0]["recorded_sha"] == drift_sha
+
+
+async def test_replay_loads_cached_rubric_after_drift(
+    engine: Engine, regressions_root: Path, tmp_path: Path
+) -> None:
+    """When the on-disk rubric SHA has drifted from the recorded SHA, the
+    harness must look up the historical bytes from the SHA-keyed cache
+    and pass them to the Judge — not silently fall back to the current
+    rubric.
+
+    Closes the audit's "harness records rubric_sha but does not actually
+    load historical rubric bytes by SHA" gap (commit pending).
+    """
+    import hashlib
+    import shutil
+
+    from agentforge_redteam.regression.rubric_cache import cache_rubric_bytes
+
+    # Build a synthetic "historical" rubric in tmp — a slight variant of the
+    # real prompt-injection-indirect rubric so we can hash it deterministically.
+    historical_dir = tmp_path / "historical_rubrics"
+    historical_dir.mkdir()
+    real_rubric = (RUBRICS_DIR / "prompt-injection-indirect.yaml").read_bytes()
+    # Append a comment so the bytes (and SHA) differ from the on-disk version.
+    historical_bytes = real_rubric + b"\n# historical-test-marker\n"
+    historical_sha = hashlib.sha256(historical_bytes).hexdigest()
+
+    # Seed a finding whose verdict.rubric_sha points at the historical version.
+    finding_id, _aid, _vid = _seed_finding(
+        engine, verdict="pass", confidence=0.9, rubric_sha=historical_sha
+    )
+
+    # Promote — this will try to cache the on-disk rubric (current bytes,
+    # current SHA), which won't match the recorded historical SHA. We then
+    # backfill the cache manually with the historical bytes so a later
+    # replay can find them.
+    cache_dir = tmp_path / "rubric_cache"
+    test_case = await promote_finding_to_regression(
+        engine,
+        finding_id,
+        target_url="http://target.local/v1/chat",
+        rubric_category="prompt-injection-indirect",
+        root=regressions_root,
+    )
+    cached_sha = cache_rubric_bytes(historical_bytes, cache_dir)
+    assert cached_sha == historical_sha
+
+    # Patch the cache lookup to point at our tmp cache_dir for this test.
+
+    judge = _make_fake_judge(verdict="pass", confidence=0.9, rubric_sha=historical_sha)
+
+    # Monkeypatch DEFAULT_CACHE_DIR for the duration of the call so the
+    # harness uses our tmp cache. Direct attribute swap is safe because
+    # the harness imports the symbol inside the function, but to be
+    # defensive we patch the real-module reference as well.
+    from agentforge_redteam.regression import rubric_cache as rubric_cache_mod
+
+    original = rubric_cache_mod.DEFAULT_CACHE_DIR
+    rubric_cache_mod.DEFAULT_CACHE_DIR = cache_dir
+    try:
+        with structlog.testing.capture_logs() as logs:
+            await replay_regression_test(
+                test_case=test_case,
+                new_target_sha="target-sha-new",
+                engine=engine,
+                http=_FakeHTTP(),
+                judge_node=judge,
+                llm_for_judge=object(),
+                rubrics_dir=RUBRICS_DIR,
+                root=regressions_root,
+            )
+    finally:
+        rubric_cache_mod.DEFAULT_CACHE_DIR = original
+        shutil.rmtree(cache_dir, ignore_errors=True)
+
+    # Cache-hit log line fires; drift-fallback warning does NOT.
+    cache_events = [
+        e for e in logs if e.get("event") == "regression.rubric_loaded_from_cache_after_drift"
+    ]
+    drift_events = [e for e in logs if e.get("event") == "regression.rubric_drift"]
+    assert len(cache_events) == 1, (
+        f"expected 1 cache-hit event, got {[e.get('event') for e in logs]!r}"
+    )
+    assert cache_events[0]["recorded_sha"] == historical_sha
+    assert len(drift_events) == 0, "harness should NOT emit drift warning when cache hit succeeds"
 
 
 # ---------------------------------------------------------------------------
